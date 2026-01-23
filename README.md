@@ -1,15 +1,15 @@
-# 📊 Data Engineering Journey | aitor-industrial-data
+# 🚀 Data Engineering Journey | aitor-industrial-data
 
-Repositorio dedicado al aprendizaje y documentación de ingeniería de datos, integrando mi background como **Ingeniero Técnico Industrial** hacia soluciones escalables en la nube.
+Ingeniero Técnico Industrial en transición hacia el Data Engineering. Este repositorio documenta mi evolución técnica, diseño de arquitecturas y optimización de pipelines.
 
-## 🚀 Progreso Actual: Mes 1 - SQL y Marca Personal
-**Hito de hoy (Día 10): Documentación Técnica y Lógica.**
+## 📁 Estructura
+- **01-SQL-Fundamentos:** Ejercicios de UC Davis y lógica relacional industrial.
 
-### 🛠️ Caso de Estudio: Arquitectura de Datos Industrial
-Para el diseño de tablas de este mes, estoy trabajando sobre la lógica de una planta de producción:
-- **Entidad Máquina:** Almacena especificaciones técnicas.
-- **Entidad Mantenimiento:** Registra intervenciones (Relación 1 a Muchos).
-- **Lógica aplicada:** Implementación de restricciones (Constraints) para evitar registros de mantenimiento en máquinas inexistentes.
+## 📑 Hito Actual: Día 10 - Documentación Técnica
+He diseñado una arquitectura relacional para una planta de producción para practicar la integridad de datos:
+- **Entidad Activos:** Maestro de maquinaria industrial.
+- **Entidad Operaciones:** Registro de telemetría y mantenimientos.
+- **Lógica:** Implementación de relaciones 1:N para asegurar la trazabilidad.
 
 ---
-*Próximo objetivo: Análisis de casos de negocio reales (Día 11).*
+*Próximo paso: Análisis de casos de negocio reales (Día 11).*
