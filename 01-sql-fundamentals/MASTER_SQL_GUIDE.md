@@ -19,3 +19,17 @@ As a Data Engineer, I prioritize efficiency:
 1. **Explain Plan:** Using `EXPLAIN QUERY PLAN` to avoid full table scans.
 2. **Indexing:** Understanding when the engine uses `SEARCH` instead of `SCAN`.
 3. **Clean Code:** Avoiding `SELECT *` to reduce I/O overhead.
+
+---
+## 🏗️ Day 15: Data Architecture & Strategy
+
+A true Data Engineer knows that the tool depends on the data's nature.
+
+### SQL vs NoSQL: The Industrial Case
+* **Time-Series Data (e.g., Voltage Sensors):** Best handled by **NoSQL**. High-velocity ingestion and horizontal scaling are priority.
+* **Relational Data (e.g., Client Contracts):** Best handled by **SQL**. ACID compliance and data integrity are non-negotiable.
+
+### Analytical Flow (The Big Picture)
+1.  **OLTP (SQL):** Where the business happens (Transactions).
+2.  **ETL Process:** The bridge where I extract, clean, and optimize data.
+3.  **OLAP (Data Warehouse):** Where decisions happen (Analysis).
