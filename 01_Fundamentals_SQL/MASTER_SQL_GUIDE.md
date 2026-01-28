@@ -1,6 +1,5 @@
-# 🏆 Master SQL Guide: Engineering Portfolio
-
-This guide documents the technical decisions and advanced logic applied during my SQL training.
+# Module 01: SQL Fundamentals & Data Architecture
+**Status:** Completed ✅ | **Role:** Data Engineer | **Environment:** Remote / Agile
 
 ## 🚀 Featured Projects & Exercises
 
@@ -53,3 +52,27 @@ FROM Dim_Track dt
 JOIN Fact_Sales fs ON dt.TrackId = fs.TrackId
 GROUP BY dt.ArtistName
 ORDER BY Revenue DESC;
+
+
+
+## Day 18: 📋 Project Overview (Jira Task: CHK-01)
+Transformation of the Chinook Relational Database into a Star Schema optimized for Business Intelligence and Analytical queries.
+
+### 🛠️ Tech Stack & Tools
+* **SQL IDE:** VS Code / DBeaver.
+* **Database:** SQLite (Chinook).
+* **Version Control:** Git & GitHub.
+* **Communication:** Slack (Mock-up reporting).
+
+### 🚀 Key Deliverables
+1. **ERD Analysis:** Identified N:M relationships and resolved them using bridge tables (`InvoiceLine`).
+2. **Star Schema Implementation:** - Created `Fact_Sales` for granular transaction tracking.
+   - Designed `Dim_Track` to centralize track metadata.
+3. **Architecture Optimization:** Denormalized specific fields (Country, Genre) to reduce JOIN overhead.
+
+## 📡 Remote Work Communication (Slack Snippet)
+*Daily Update - 2026-01-28:*
+> "Hi team, I've completed the architectural migration of the Chinook dataset. The scripts are now available in `/Scripts`. This new Star Schema reduces query complexity for the BI team. Ready for the Data Wrangling phase."
+
+---
+*Developed by Aitor - Data Engineering Roadmap 2026*
