@@ -77,9 +77,3 @@ Transformation of the Chinook Relational Database into a Star Schema optimized f
 ---
 *Developed by Aitor - Data Engineering Roadmap 2026*
 
-![Mi Esquema en Estrella](C:\Users\Aitor AL\Documents\Data-Projects-Repo\01_Fundamentals_SQL\Images\Chinook star diagram.png)
-
-
-![alt text](<Chinook star diagram.png>)
-
-![](2026-01-28-10-49-08.png)
