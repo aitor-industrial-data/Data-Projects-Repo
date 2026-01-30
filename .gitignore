@@ -1,0 +1,6 @@
+# Ignorar el archivo de base de datos de SQLite
+*.db
+*.sqlite
+
+# Ignorar carpetas con datos locales
+/01_Fundamentals_SQL/Database_Storage/

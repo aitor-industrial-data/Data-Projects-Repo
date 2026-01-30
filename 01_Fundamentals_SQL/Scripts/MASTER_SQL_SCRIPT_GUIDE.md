@@ -12,6 +12,7 @@ Para reconstruir el modelo analítico correctamente y mantener la integridad ref
 
 | Orden | Archivo | Descripción del Proceso |
 | :--- | :--- | :--- |
+| **00** | `00_inventory_sanity_checks.sql` | **Auditoría y Control de Calidad**: Verificación del esquema (sqlite_master), validación de integridad de datos (Expected vs Actual) y chequeo de salud inicial del entorno. |
 | **01** | `01_data_wrangling_tracks.sql` | **Limpieza y Estandarización**: Eliminación de espacios, normalización a mayúsculas, gestión de nulos (`COALESCE`) y conversión de unidades (ms a min, Bytes a MB). |
 | **02** | `02_create_dim_tracks.sql` | **Modelado de Dimensión**: Creación de la tabla `Dim_Track`. Desnormalización de géneros y tipos de medio para minimizar `JOINs` en consultas finales. |
 | **03** | `03_create_fact_sales.sql` | **Diseño de Tabla de Hechos**: Definición de `Fact_Sales`. Implementación de **Surrogate Keys** (Claves Subrogadas) y métricas de venta agregadas. |
