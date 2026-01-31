@@ -1,0 +1,23 @@
+# Análisis de Producción Agrícola (Proyecto SQL de UC Davis)
+
+## Descripción del Proyecto
+Este proyecto se centra en los aspectos fundamentales de la Ingeniería de Datos: **Definición de Esquemas (Schema Definition)** e **Ingesta de Datos (Data Ingestion)**. Utilizando conjuntos de datos agrícolas (leche, huevos, queso, miel, etc.), he construido una estructura relacional para almacenar y consultar datos de producción.
+
+## Stack Tecnológico
+- **Motor de Base de Datos:** SQLite
+- **Cliente/GUI:** DBeaver
+- **Lenguajes:** SQL (DDL y DML)
+
+## Estructura del Proyecto
+- `/source`: Archivos CSV originales (Raw Data) proporcionados por el curso.
+- `/scripts`: Scripts de SQL organizados por orden de ejecución.
+    - `01_create_tables.sql`: Script DDL para definir el esquema de la base de datos.
+- `/database_storage/work`: Archivo local de la base de datos SQLite.
+
+## Objetivos de Aprendizaje
+1. **Organización de Datos:** Implementación de una estructura de carpetas profesional para tuberías de datos (Data Pipelines).
+2. **Diseño de Esquemas:** Definición de tipos de datos adecuados (INTEGER, TEXT) para métricas agrícolas.
+3. **Ingesta de Datos:** Gestión del proceso de importación de CSV a una base de datos relacional.
+
+---
+*Este proyecto es parte de mi plan de 6 meses para convertirme en Data Engineer.*
