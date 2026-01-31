@@ -12,6 +12,7 @@ Este proyecto se centra en los aspectos fundamentales de la Ingeniería de Datos
 - `/source`: Archivos CSV originales (Raw Data) proporcionados por el curso.
 - `/scripts`: Scripts de SQL organizados por orden de ejecución.
     - `01_create_tables.sql`: Script DDL para definir el esquema de la base de datos.
+    - `02_data_cleaning.sql`: Limpieza y normalización de datos (DML). Este script elimina caracteres especiales (como comas en los campos numéricos) para permitir el análisis matemático y asegurar la integridad de los datos.
 - `/database_storage/work`: Archivo local de la base de datos SQLite.
 
 ## Objetivos de Aprendizaje
