@@ -13,3 +13,10 @@ He diseñado una arquitectura relacional para una planta de producción para pra
 
 ---
 *Próximo paso: Análisis de casos de negocio reales (Día 11).*
+
+
+
+
+"Nota: Este proyecto utiliza la versión "Singular" de la base de datos Chinook (ej., la tabla "Customer" en lugar de "Customers"). Si utiliza la versión plural, ajuste los nombres de las tablas según corresponda."
+
+"Note: This project uses the 'Singular' version of the Chinook database (e.g., Table 'Customer' instead of 'Customers'). If you are using the plural version, please adjust the table names accordingly."
