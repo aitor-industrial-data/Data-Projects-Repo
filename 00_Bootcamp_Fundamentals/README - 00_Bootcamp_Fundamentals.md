@@ -9,8 +9,7 @@ Este proyecto se centra en los aspectos fundamentales de la Ingeniería de Datos
 - **Lenguajes:** SQL (DDL y DML)
 
 ## Esquema de Datos (ERD)
-![Diagrama de la Base de Datos](./images/Diagram_UC_Davis_Agriculture_Project.png) 
-*(Nota: Asegúrate de que el nombre del archivo en la carpeta /image coincida con el que pongas aquí)*
+![Diagrama de la Base de Datos](./Images/Diagram_UC_Davis_Agriculture_Project.png) 
 
 ## Estructura del Proyecto
 - `/source`: Archivos CSV originales (Raw Data) proporcionados por el curso.
