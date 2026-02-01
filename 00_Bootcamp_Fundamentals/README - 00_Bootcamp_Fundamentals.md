@@ -10,6 +10,11 @@ Este proyecto se centra en los aspectos fundamentales de la Ingeniería de Datos
 
 ## Esquema de Datos (ERD)
 ![Diagrama de la Base de Datos](./Images/Diagram_UC_Davis_Agriculture_Project.png) 
+<details>
+  <summary><b>Ver Diagrama de Entidad-Relación (ERD) 🗺️</b></summary>
+  <br>
+  <img src="./image/diagrama.png" alt="Database Schema" width="800">
+</details>
 
 ## Estructura del Proyecto
 - `/source`: Archivos CSV originales (Raw Data) proporcionados por el curso.
