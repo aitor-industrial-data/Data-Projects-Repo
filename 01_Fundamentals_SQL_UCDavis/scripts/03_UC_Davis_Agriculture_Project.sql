@@ -1,6 +1,7 @@
 /*
 ================================================================================
 PROYECTO FINAL: Data Scientist en el USDA (Departamento de Agricultura de EE. UU.)
+FASE 3: Análisis de Datos y Business Insights
 ================================================================================
 ESCENARIO:
 Análisis de producción agrícola para decisiones estratégicas del USDA.
