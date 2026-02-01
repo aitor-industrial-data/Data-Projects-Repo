@@ -3,5 +3,5 @@
 *.sqlite
 
 # Ignorar carpetas con datos locales
-/00_Bootcamp_Fundamentals/Database_Storage/
-/01_Fundamentals_SQL/Database_Storage/
+/00_Bootcamp_Fundamentals/database_storage/
+/01_Fundamentals_SQL/database_storage/

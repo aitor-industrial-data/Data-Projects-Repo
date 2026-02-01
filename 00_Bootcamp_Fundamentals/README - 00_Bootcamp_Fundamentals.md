@@ -13,17 +13,16 @@ Este proyecto se centra en los aspectos fundamentales de la Ingeniería de Datos
 <details>
   <summary><b>Ver Diagrama de Entidad-Relación (ERD) 🗺️</b></summary>
   <br>
-  <img src="./Images/Diagram_UC_Davis_Agriculture_Project.png" alt="Database Schema" width="800">
+  <img src="./images/Diagram_UC_Davis_Agriculture_Project.png" alt="Database Schema" width="800">
 </details>
 
 ## Estructura del Proyecto
-- `/source`: Archivos CSV originales (Raw Data) proporcionados por el curso.
+- `/source`: Archivos CSV originales (Raw Data).
 - `/scripts`: Scripts de SQL organizados por orden de ejecución.
-    - `01_create_tables.sql`: Script DDL para definir el esquema de la base de datos.
-    - `02_data_cleaning.sql`: Limpieza y normalización de datos (DML). Este script elimina caracteres especiales (como comas en los campos numéricos) para permitir el análisis matemático y asegurar la integridad de los datos.
-    - `03_UC_Davis_Agriculture_Project.sql`: Proyecto Final (Capstone). Análisis exhaustivo mediante JOINS, subconsultas y funciones de agregación.
-- `/image`: Diagramas y capturas de pantalla del modelo de datos.
-- `/database_storage/work`: Archivo local de la base de datos SQLite.
+    - [`01_create_tables.sql`](./scripts/01_create_tables.sql): Script DDL para definir el esquema de la base de datos.
+    - [`02_data_cleaning.sql`](./scripts/02_data_cleaning.sql): Limpieza y normalización de datos (DML). Este script elimina caracteres especiales (como comas en los campos numéricos) para permitir el análisis matemático y asegurar la integridad de los datos.
+    - [`03_UC_Davis_Agriculture_Project.sql`](./scripts/03_UC_Davis_Agriculture_Project.sql): Proyecto Final (Capstone). Análisis exhaustivo mediante JOINS, subconsultas y funciones de agregación.
+- `/image`: [Diagrama de la Base de Datos](./image/diagrama.png).
 
 ## Objetivos de Aprendizaje
 1. **Organización de Datos:** Implementación de una estructura de carpetas profesional para tuberías de datos (Data Pipelines).
