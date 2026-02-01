@@ -22,8 +22,7 @@ Este proyecto se centra en los aspectos fundamentales de la Ingeniería de Datos
     - [`01_create_tables.sql`](./scripts/01_create_agriculture_tables.sql): Script DDL para definir el esquema de la base de datos.
     - [`02_data_cleaning.sql`](./scripts/02_data_cleaning.sql): Limpieza y normalización de datos (DML). Este script elimina caracteres especiales (como comas en los campos numéricos) para permitir el análisis matemático y asegurar la integridad de los datos.
     - [`03_UC_Davis_Agriculture_Project.sql`](./scripts/03_UC_Davis_Agriculture_Project.sql): Proyecto Final (Capstone). Análisis exhaustivo mediante JOINS, subconsultas y funciones de agregación.
-- `/image`: [Diagrama de la Base de Datos](./images/Diagram_UC_Davis_Agriculture_Project.png).
-
+- `/image`: Diagrama de la Base de Datos.
 ## Objetivos de Aprendizaje
 1. **Organización de Datos:** Implementación de una estructura de carpetas profesional para tuberías de datos (Data Pipelines).
 2. **Diseño de Esquemas:** Definición de tipos de datos adecuados (INTEGER, TEXT) para métricas agrícolas.
