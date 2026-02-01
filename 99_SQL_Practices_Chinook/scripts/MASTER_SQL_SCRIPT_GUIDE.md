@@ -30,7 +30,6 @@ Para reconstruir el modelo analítico correctamente y mantener la integridad ref
 
 ---
 
-> **Nota:** Este pipeline es el entregable principal del **Mes 1** del plan de Ingeniería de Datos de Élite.
 
 > **Nota:** Este proyecto utiliza la versión "Singular" de la base de datos Chinook (ej., la tabla "Customer" en lugar de "Customers"). Si utiliza la versión plural, ajuste los nombres de las tablas según corresponda."
 
