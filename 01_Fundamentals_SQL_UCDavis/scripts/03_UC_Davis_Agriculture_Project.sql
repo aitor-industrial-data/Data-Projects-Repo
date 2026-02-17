@@ -5,7 +5,8 @@ FASE 3: Análisis de Datos y Business Insights
 ================================================================================
 ESCENARIO:
 Análisis de producción agrícola para decisiones estratégicas del USDA.
-DATASETS: milk_production, cheese_production, coffee_production, honey_production, egg_production, yogurt_production y state_lookup.
+DATASETS: milk_production, cheese_production, coffee_production, honey_production,
+egg_production, yogurt_production y state_lookup.
 ================================================================================
 */
 

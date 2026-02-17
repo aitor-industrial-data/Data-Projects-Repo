@@ -1,7 +1,9 @@
-# Análisis de Producción Agrícola (Proyecto SQL de UC Davis)
 
+# Análisis de Producción Agrícola (Proyecto SQL de UC Davis)
 ## Descripción del Proyecto
-Este proyecto se centra en los aspectos fundamentales de la Ingeniería de Datos: **Definición de Esquemas (Schema Definition)** e **Ingesta de Datos (Data Ingestion)**. Utilizando conjuntos de datos agrícolas (leche, huevos, queso, miel, etc.), he construido una estructura relacional para almacenar y consultar datos de producción.
+Este repositorio contiene el proyecto final (Capstone) del curso **"SQL for Data Science"** impartido por la **University of California, Davis (UC Davis)**.
+
+Se centra en los aspectos fundamentales de la Ingeniería de Datos: **Definición de Esquemas (Schema Definition)** e **Ingesta de Datos (Data Ingestion)**. Utilizando conjuntos de datos agrícolas (leche, huevos, queso, miel, etc.), he construido una estructura relacional para almacenar y consultar datos de producción.
 
 ## Stack Tecnológico
 - **Motor de Base de Datos:** SQLite
@@ -30,4 +32,4 @@ Este proyecto se centra en los aspectos fundamentales de la Ingeniería de Datos
 4. **Análisis de Datos:** Extracción de insights mediante lógica SQL avanzada aprendida en el curso de UC Davis.
 
 ---
-*Este proyecto es parte de mi plan de 6 meses para convertirme en Data Engineer.*
+*Proyecto de certificación integrado en mi programa de especialización intensiva en Data Engineering*
