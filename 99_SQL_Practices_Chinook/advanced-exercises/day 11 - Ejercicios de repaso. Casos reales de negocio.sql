@@ -21,3 +21,5 @@ HAVING Gasto_Total > (
         GROUP BY CustomerId
     )
 );
+
+
