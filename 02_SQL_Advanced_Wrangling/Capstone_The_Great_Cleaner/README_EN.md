@@ -48,9 +48,9 @@ The project is structured into three sequential phases, applying the **Medallion
 ## 🚀 How to Run
 1. Connect to the Chinook SQLite database using your preferred IDE (e.g., DB Browser or DBeaver).
 2. Execute the scripts in sequential order:
-   - [`01_Silver_Customer_Cleansing.sql`](./Capstone_The_Great_Cleaner/01_Silver_Customer_Cleansing.sql)
-   - [`02_Silver_Track_Audit.sql`](./Capstone_The_Great_Cleaner/02_Silver_Track_Audit.sql)
-   - [`03_Gold_Sales_Master.sql`](./Capstone_The_Great_Cleaner/03_Gold_Sales_Master.sql)
+   - [`01_Silver_Customer_Cleansing.sql`](./01_Silver_Customer_Cleansing.sql)
+   - [`02_Silver_Track_Audit.sql`](./02_Silver_Track_Audit.sql)
+   - [`03_Gold_Sales_Master.sql`](./03_Gold_Sales_Master.sql)
 3. Query the final Gold view to see the results:
    ```sql
    SELECT * FROM V_Gold_Sales_Analytics LIMIT 100;
