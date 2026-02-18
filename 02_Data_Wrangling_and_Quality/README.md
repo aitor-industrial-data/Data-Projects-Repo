@@ -8,7 +8,7 @@ El repositorio está organizado de forma modular para reflejar un flujo de traba
 
 
 * **[Data_Cleaning_SQL](./02.01_Data_Cleaning_SQL/)**: Colección de scripts y ejercicios diarios enfocados en la resolución de problemas específicos de limpieza y transformación.
-* **[CAPSTONE: The Great Cleaner](./02.02_Capstone_The_Great_Cleaner/)**: Mi proyecto estrella de consolidación. Un pipeline de limpieza en 3 fases que aplica una arquitectura de capas sobre la base de datos Chinook.
+* **[CAPSTONE: The Great Cleaner](./02.02_CAPSTONE_The_Great_Cleaner/)**: Mi proyecto estrella de consolidación. Un pipeline de limpieza en 3 fases que aplica una arquitectura de capas sobre la base de datos Chinook.
 
 ## 🚀 Habilidades Técnicas Consolidadas
 
