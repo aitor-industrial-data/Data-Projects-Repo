@@ -1,4 +1,4 @@
-# 02 Data Wrangling & Quality Assurance 🛠️
+# 02_ Data Wrangling & Quality Assurance 🛠️
 
 Este módulo marca la transición de un usuario de SQL básico a un **Ingeniero de Datos** capaz de auditar, limpiar y estructurar información bajo estándares de producción. Durante este apartado, el foco ha sido la transformación de datos crudos (Bronze) en activos digitales fiables (Silver/Gold).
 
@@ -6,9 +6,9 @@ Este módulo marca la transición de un usuario de SQL básico a un **Ingeniero 
 
 El repositorio está organizado de forma modular para reflejar un flujo de trabajo profesional:
 
-* **[CAPSTONE: The Great Cleaner](./Capstone_The_Great_Cleaner/)**: Mi proyecto estrella de consolidación. Un pipeline de limpieza en 3 fases que aplica una arquitectura de capas sobre la base de datos Chinook.
-* **[Data_Cleaning_SQL](./Data_Cleaning_SQL/)**: Colección de scripts y ejercicios diarios enfocados en la resolución de problemas específicos de limpieza y transformación.
 
+* **[Data_Cleaning_SQL](./01_Data_Cleaning_SQL/)**: Colección de scripts y ejercicios diarios enfocados en la resolución de problemas específicos de limpieza y transformación.
+* **[CAPSTONE: The Great Cleaner](./02_Capstone_The_Great_Cleaner/)**: Mi proyecto estrella de consolidación. Un pipeline de limpieza en 3 fases que aplica una arquitectura de capas sobre la base de datos Chinook.
 
 ## 🚀 Habilidades Técnicas Consolidadas
 
