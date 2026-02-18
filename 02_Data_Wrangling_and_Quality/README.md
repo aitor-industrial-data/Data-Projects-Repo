@@ -1,4 +1,4 @@
-# Data Wrangling & Quality Assurance 🛠️
+# 02 Data Wrangling & Quality Assurance 🛠️
 
 Este módulo marca la transición de un usuario de SQL básico a un **Ingeniero de Datos** capaz de auditar, limpiar y estructurar información bajo estándares de producción. Durante este apartado, el foco ha sido la transformación de datos crudos (Bronze) en activos digitales fiables (Silver/Gold).
 
