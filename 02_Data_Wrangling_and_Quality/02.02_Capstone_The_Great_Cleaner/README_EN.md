@@ -1,4 +1,5 @@
 # 🧹 The Great Cleaner: SQL Data Wrangling & Profiling Pipeline
+[Versión en español](README.md)
 
 ![SQL](https://img.shields.io/badge/SQL-SQLite-blue)
 ![Data Engineering](https://img.shields.io/badge/Data_Engineering-Wrangling-orange)
