@@ -1,6 +1,6 @@
-# Mes 2: Data Wrangling & Quality Assurance 🛠️
+# Data Wrangling & Quality Assurance 🛠️
 
-Este módulo marca la transición de un usuario de SQL básico a un **Ingeniero de Datos** capaz de auditar, limpiar y estructurar información bajo estándares de producción. Durante este mes, el foco ha sido la transformación de datos crudos (Bronze) en activos digitales fiables (Silver/Gold).
+Este módulo marca la transición de un usuario de SQL básico a un **Ingeniero de Datos** capaz de auditar, limpiar y estructurar información bajo estándares de producción. Durante este apartado, el foco ha sido la transformación de datos crudos (Bronze) en activos digitales fiables (Silver/Gold).
 
 ## 📂 Estructura del Módulo
 
@@ -31,4 +31,4 @@ El repositorio está organizado de forma modular para reflejar un flujo de traba
 - **Git Bash:** Control de versiones y despliegue a GitHub.
 
 ---
-*Este módulo forma parte de mi plan de 6 meses para convertirme en Data Engineer, enfocado en ganar eficiencia técnica y capacidad analítica para entornos de trabajo remoto.*
+*Este módulo forma parte de mi programa de especialización intensiva en Data Engineering, enfocado en ganar eficiencia técnica y capacidad analítica para entornos de trabajo remoto.*

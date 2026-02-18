@@ -5,5 +5,5 @@
 
 # Ignorar carpetas con datos locales
 /01_SQL_Fundamentals_UCDavis/database_storage/
-/02_SQL_Advanced_Wrangling/database_storage/
+/02_Data_Wrangling_and_Quality/database_storage/
 /99_SQL_Practices_Chinook/database_storage/
