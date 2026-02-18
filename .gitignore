@@ -3,6 +3,6 @@
 *.sqlite
 
 # Ignorar carpetas con datos locales
-/01_Fundamentals_SQL_UCDavis/database_storage/
-/02_Data_Wrangling_AB/database_storage/
+/01_SQL_Fundamentals_UCDavis/database_storage/
+/02_SQL_Advanced_Wrangling/database_storage/
 /99_SQL_Practices_Chinook/database_storage/

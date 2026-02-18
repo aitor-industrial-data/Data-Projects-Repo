@@ -49,9 +49,9 @@ El proyecto se estructura en tres fases secuenciales, aplicando los principios d
 ## 🚀 Cómo Ejecutarlo
 1. Conéctate a la base de datos Chinook usando tu IDE preferido.
 2. Ejecuta los scripts en orden secuencial:
-   - `01_Silver_Customer_Cleansing.sql`
-   - `02_Silver_Track_Audit.sql`
-   - `03_Gold_Sales_Master.sql`
+   - [`01_Silver_Customer_Cleansing.sql`](./Capstone_The_Great_Cleaner/01_Silver_Customer_Cleansing.sql)
+   - [`02_Silver_Track_Audit.sql`](./Capstone_The_Great_Cleaner/02_Silver_Track_Audit.sql)
+   - [`03_Gold_Sales_Master.sql`](./Capstone_The_Great_Cleaner/03_Gold_Sales_Master.sql)
 3. Consulta la vista final para ver los resultados:
    ```sql
    SELECT * FROM V_Gold_Sales_Analytics LIMIT 100;
