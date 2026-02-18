@@ -1,4 +1,5 @@
 # 🧹 The Great Cleaner: Pipeline de Limpieza y Auditoría de Datos en SQL
+[English Version](README_EN.md)
 
 ![SQL](https://img.shields.io/badge/SQL-SQLite-blue)
 ![Data Engineering](https://img.shields.io/badge/Data_Engineering-Wrangling-orange)
