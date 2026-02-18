@@ -1,6 +1,7 @@
 # Ignorar el archivo de base de datos de SQLite
 *.db
 *.sqlite
+*.CSV
 
 # Ignorar carpetas con datos locales
 /01_SQL_Fundamentals_UCDavis/database_storage/
