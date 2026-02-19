@@ -4,6 +4,7 @@
 *.csv
 
 # Ignorar carpetas con datos locales
-/01_SQL_Fundamentals_UCDavis/database_storage/
-/02_Data_Wrangling_and_Quality/database_storage/
+/01_SQL_Fundamentals/database_storage/
+/01_SQL_Fundamentals/database_storage/01.02_CAPSTONE_UC_Davis_Agriculture_Project/database_storage/
+/02_SQL_Advanced_Wrangling_and_Testing/database_storage/
 /99_SQL_Practices_Chinook/database_storage/
