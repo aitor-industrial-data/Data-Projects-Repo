@@ -40,6 +40,3 @@ Estos ejercicios demuestran mi capacidad para extraer, limpiar y agregar datos d
 2.  **Calidad de Datos:** Uso de filtros `IS NULL` y `IS NOT NULL` para asegurar la integridad de los reportes.
 3.  **Analítica:** Desarrollo de consultas complejas utilizando agrupaciones y funciones de agregado para extraer KPIs.
 4.  **Estándares Profesionales:** Todos los archivos siguen convenciones de nomenclatura en inglés y un formato de código limpio.
-
----
-**Siguiente paso:** **SQL_Advanced_Wrangling_and_Testing** para la limpieza de datos avanzada, optimización de rendimiento y validación mediante A/B Testing.
