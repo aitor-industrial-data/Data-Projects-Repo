@@ -1,4 +1,4 @@
-# 02_ Data Wrangling & Quality Assurance 🛠️
+# 02_ Data Quality, Wrangling & Testing 🛠️
 
 Este módulo marca la transición de un usuario de SQL básico a un **Ingeniero de Datos** capaz de auditar, limpiar y estructurar información bajo estándares de producción. Durante este apartado, el foco ha sido la transformación de datos crudos (Bronze) en activos digitales fiables (Silver/Gold).
 
@@ -6,9 +6,9 @@ Este módulo marca la transición de un usuario de SQL básico a un **Ingeniero 
 
 El repositorio está organizado de forma modular para reflejar un flujo de trabajo profesional:
 
-
 * **[Data_Cleaning_SQL](./02.01_Data_Cleaning_SQL/)**: Colección de scripts y ejercicios diarios enfocados en la resolución de problemas específicos de limpieza y transformación.
 * **[CAPSTONE: The Great Cleaner](./02.02_CAPSTONE_The_Great_Cleaner/)**: Mi proyecto estrella de consolidación. Un pipeline de limpieza en 3 fases que aplica una arquitectura de capas sobre la base de datos Chinook.
+* **[AB_Testing_SQL](./02.03_AB_Testing_SQL/)**: Implementación de un flujo experimental completo sobre la capa Gold. Incluye la segmentación determinista de usuarios y el análisis de métricas de negocio (ARPU y conversión) para la toma de decisiones basada en datos.
 
 ## 🚀 Habilidades Técnicas Consolidadas
 
@@ -24,6 +24,11 @@ El repositorio está organizado de forma modular para reflejar un flujo de traba
 ### 3. SQL de Alto Rendimiento
 - **Window Functions:** Implementación de `COUNT() OVER`, `SUM() OVER` y particionamiento de datos para analítica avanzada sin colapsar registros.
 - **CTEs (Common Table Expressions):** Estructuración de consultas legibles, modulares y fáciles de mantener.
+
+### 4. Experimentación y Análisis de Negocio (A/B Testing)
+- **Segmentación Determinista:** Creación de grupos de control (A) y variante (B) mediante operadores matemáticos (`MOD`) para asegurar una distribución 50/50 equilibrada y reproducible.
+- **Cálculo de KPIs de Performance:** Desarrollo de consultas para medir el **ARPU** (Average Revenue Per User) e ingresos totales, permitiendo cuantificar la rentabilidad de cambios en el producto.
+- **Análisis de Conversión:** Uso de `LEFT JOIN` avanzado para evitar el "sesgo de supervivencia", incluyendo en las métricas a usuarios que no realizaron transacciones.
 
 ## 🛠️ Herramientas Utilizadas
 - **DB Browser for SQLite & DBeaver:** Gestión y visualización de bases de datos.
