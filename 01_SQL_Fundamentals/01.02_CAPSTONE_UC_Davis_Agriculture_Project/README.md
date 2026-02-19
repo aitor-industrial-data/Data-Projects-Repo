@@ -13,7 +13,7 @@ Se centra en los aspectos fundamentales de la Ingeniería de Datos: **Definició
 ## 🗺️ Esquema de Datos (ERD)
 
 <details>
-  <summary><b>Ver Diagrama de Entidad-Relación (ERD) 🗺️</b></summary>
+  <summary><b>Ver Diagrama de Entidad-Relación (ERD)</b></summary>
   <br>
   <img src="./images/Diagram_UC_Davis_Agriculture_Project.png" alt="Database Schema" width="800">
 </details>
