@@ -32,4 +32,4 @@ Se centra en los aspectos fundamentales de la Ingeniería de Datos: **Definició
 4. **Análisis de Datos:** Extracción de insights mediante lógica SQL avanzada aprendida en el curso de UC Davis.
 
 ---
-*Proyecto de certificación integrado en mi programa de especialización intensiva en Data Engineering*
+*Proyecto de certificación UC DAVIS integrado en mi programa de especialización intensiva en Data Engineering*

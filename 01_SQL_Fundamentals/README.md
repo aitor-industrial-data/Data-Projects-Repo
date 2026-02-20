@@ -1,4 +1,4 @@
-# 🏛️ 01_SQL_Fundamentals: Arquitectura de Datos y Consultas Relacionales
+# 01_SQL_Fundamentals: Arquitectura de Datos y Consultas Relacionales
 
 ## 📑 Descripción General
 Este repositorio constituye el núcleo técnico del **SQL_Fundamentals** de mi especialización en Ingeniería de Datos. Aquí se gestiona desde el almacenamiento de datos brutos hasta la ejecución de consultas analíticas complejas y proyectos finales de bloque (Capstone).

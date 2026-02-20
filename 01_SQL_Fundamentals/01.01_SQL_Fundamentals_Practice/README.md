@@ -1,4 +1,4 @@
-# 📊 SQL_Fundamentals_Practice
+# SQL_Fundamentals_Practice
 
 ## 📂 Descripción del Proyecto
 Este directorio contiene una colección de scripts SQL desarrollados durante el modulo **01_SQL_Fundamentals** de mi plan de especialización en Ingeniería de Datos. El objetivo de esta etapa fue dominar los **Fundamentos de SQL**, utilizando la base de datos **Chinook** (esquema en singular) para resolver problemas de lógica de negocio reales.
