@@ -18,20 +18,20 @@ Estos ejercicios demuestran mi capacidad para extraer, limpiar y agregar datos d
 
 | # | Nombre del Archivo | Enunciado / Problema Real | Foco Técnico |
 | :--- | :--- | :--- | :--- |
-| 01 | `01_customer_contact_brazil.sql` | Obtener nombres y correos de clientes de Brasil. | `SELECT` / `WHERE` |
-| 02 | `02_rock_tracks_by_duration.sql` | Listar canciones de Rock por duración (mayor a menor). | `ORDER BY` |
-| 03 | `03_unique_client_markets.sql` | Listar países únicos con clientes. | `DISTINCT` |
-| 04 | `04_sales_q1_2024.sql` | Identificar facturas emitidas en el Q1 de 2024. | `Date Filtering` |
-| 05 | `05_unmanaged_employees.sql` | Listar empleados sin jefe asignado (Nivel Directivo). | `IS NULL` |
-| 06 | `06_customer_name_search.sql` | Buscar clientes con patrones específicos ("J...n"). | `LIKE` / `Wildcards` |
-| 07 | `07_album_artist_mapping.sql` | Relacionar títulos de álbumes con sus artistas. | `INNER JOIN` |
-| 08 | `08_invoice_customer_details.sql` | Listar facturas con el nombre completo del cliente. | `JOIN` / `Aliases` |
-| 09 | `09_track_media_inventory.sql` | Listar canciones con su género y tipo de formato. | `Multiple JOINs` |
-| 10 | `10_total_historical_revenue.sql` | Calcular el ingreso total histórico de la tienda. | `SUM` |
-| 11 | `11_avg_album_duration.sql` | Calcular la duración media por cada álbum. | `AVG` / `GROUP BY` |
-| 12 | `12_jazz_price_range.sql` | Encontrar el rango de precios (Mín/Máx) en Jazz. | `MIN` / `MAX` |
-| 13 | `13_playlist_track_count.sql` | Contar canciones por cada lista de reproducción. | `COUNT` / `JOIN` |
-| 14 | `14_popular_genres_report.sql` | Filtrar géneros con más de 100 canciones. | `HAVING` |
+| 01 | [`01_customer_contact_brazil.sql`](./scripts/01_customer_contact_brazil.sql) | Obtener nombres y correos de clientes de Brasil. | `SELECT` / `WHERE` |
+| 02 | [`02_rock_tracks_by_duration.sql`](./scripts/02_rock_tracks_by_duration.sql) | Listar canciones de Rock por duración (mayor a menor). | `ORDER BY` |
+| 03 | [`03_unique_client_markets.sql`](./scripts/03_unique_client_markets.sql) | Listar países únicos con clientes. | `DISTINCT` |
+| 04 | [`04_sales_q1_2024.sql`](./scripts/04_sales_q1_2024.sql) | Identificar facturas emitidas en el Q1 de 2024. | `Date Filtering` |
+| 05 | [`05_unmanaged_employees.sql`](./scripts/05_unmanaged_employees.sql) | Listar empleados sin jefe asignado (Nivel Directivo). | `IS NULL` |
+| 06 | [`06_customer_name_search.sql`](./scripts/06_customer_name_search.sql) | Buscar clientes con patrones específicos ("J...n"). | `LIKE` / `Wildcards` |
+| 07 | [`07_album_artist_mapping.sql`](./scripts/07_album_artist_mapping.sql) | Relacionar títulos de álbumes con sus artistas. | `INNER JOIN` |
+| 08 | [`08_invoice_customer_details.sql`](./scripts/08_invoice_customer_details.sql) | Listar facturas con el nombre completo del cliente. | `JOIN` / `Aliases` |
+| 09 | [`09_track_media_inventory.sql`](./scripts/09_track_media_inventory.sql) | Listar canciones con su género y tipo de formato. | `Multiple JOINs` |
+| 10 | [`10_total_historical_revenue.sql`](./scripts/10_total_historical_revenue.sql) | Calcular el ingreso total histórico de la tienda. | `SUM` |
+| 11 | [`11_avg_album_duration.sql`](./scripts/11_avg_album_duration.sql) | Calcular la duración media por cada álbum. | `AVG` / `GROUP BY` |
+| 12 | [`12_jazz_price_range.sql`](./scripts/12_jazz_price_range.sql) | Encontrar el rango de precios (Mín/Máx) en Jazz. | `MIN` / `MAX` |
+| 13 | [`13_playlist_track_count.sql`](./scripts/13_playlist_track_count.sql) | Contar canciones por cada lista de reproducción. | `COUNT` / `JOIN` |
+| 14 | [`14_popular_genres_report.sql`](./scripts/14_popular_genres_report.sql) | Filtrar géneros con más de 100 canciones. | `HAVING` |
 
 ---
 
