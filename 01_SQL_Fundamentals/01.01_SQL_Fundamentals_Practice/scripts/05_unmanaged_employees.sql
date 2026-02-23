@@ -35,6 +35,6 @@ ORDER BY HireDate DESC;
 --    para asegurar que el set de resultados no contenga filas redundantes.
 -- 4. Ordenamiento Temporal: Se prioriza la visualización de los líderes con 
 --    incorporación más reciente (Fundamento ORDER BY DESC).
--- 5. Perfil de Datos: Como ingeniero, este reporte te permite auditar quiénes 
+-- 5. Perfil de Datos: Este reporte te permite auditar quiénes 
 --    toman las decisiones en la empresa y desde cuándo.
 --------------------------------------------------------------------------------

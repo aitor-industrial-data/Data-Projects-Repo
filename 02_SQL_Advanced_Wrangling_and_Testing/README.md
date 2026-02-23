@@ -8,8 +8,9 @@ El repositorio está organizado de forma modular para reflejar un flujo de traba
 
 * **[02.01_SQL_Advanced_Practice](./02.01_SQL_Advanced_Practice/)**: Batería de ejercicios avanzados que cubren desde Window Functions hasta auditorías de integridad. Es la base técnica del módulo.
 * **[02.02_Data_Cleaning_SQL](./02.02_Data_Cleaning_SQL/)**: Scripts y metodologías enfocadas en la resolución de problemas específicos de limpieza y transformación de tipos de datos.
-* **[02.03_CAPSTONE_The_Great_Cleaner](./02.03_CAPSTONE_The_Great_Cleaner/)**: Mi proyecto estrella de consolidación. Un pipeline de limpieza en 3 fases que aplica una arquitectura de capas sobre la base de datos Chinook.
+* **[02.03_CAPSTONE_The_Great_Cleaner](./02.03_CAPSTONE_The_Great_Cleaner/)**: **Proyecto Final de Especialización.** Un pipeline de limpieza y transformación en 3 fases sobre la base de datos Chinook, donde se aplica arquitectura de capas y auditoría de calidad de datos.
 * **[02.04_AB_Testing_SQL](./02.04_AB_Testing_SQL/)**: Implementación de un flujo experimental completo sobre la capa Gold. Incluye la segmentación determinista de usuarios y el análisis de métricas de negocio (ARPU y conversión).
+* **[02.05_CAPSTONE_CoffeeKing_Yelp](./02.05_CAPSTONE_CoffeeKing_Yelp/)**: **Proyecto Final de Consultoría.** Aplicación de analítica avanzada sobre el dataset de Yelp para optimizar la expansión de una cadena de cafeterías. Incluye validación de hipótesis, métricas de ingeniería (PEI/CP) e informe ejecutivo para dirección.
 
 ## 🚀 Habilidades Técnicas Consolidadas
 
@@ -30,6 +31,11 @@ El repositorio está organizado de forma modular para reflejar un flujo de traba
 - **Segmentación Determinista:** Creación de grupos de control (A) y variante (B) mediante operadores matemáticos (`MOD`) para asegurar una distribución equilibrada y reproducible.
 - **Cálculo de KPIs de Performance:** Desarrollo de consultas para medir el **ARPU** (Average Revenue Per User) e ingresos totales.
 - **Análisis de Conversión:** Uso de `LEFT JOIN` avanzado para evitar el "sesgo de supervivencia", incluyendo en las métricas a usuarios sin transacciones.
+
+### 5. Proyectos Capstone: CoffeeKing & Chinook Optimization
+- **Arquitectura Medallón (Bronze/Silver/Gold):** Implementación de un flujo de datos que separa los datos crudos de los activos optimizados para negocio.
+- **Validación de Hipótesis Estratégicas:** Uso de SQL para confirmar o refutar objetivos de expansión comercial basados en el comportamiento del cliente.
+- **Documentación Técnica Senior:** Elaboración de un informe ejecutivo final con métricas avanzadas (PEI/CP) y diagramas de arquitectura.
 
 ## 🛠️ Herramientas Utilizadas
 - **DB Browser for SQLite & DBeaver:** Gestión y visualización de bases de datos.
