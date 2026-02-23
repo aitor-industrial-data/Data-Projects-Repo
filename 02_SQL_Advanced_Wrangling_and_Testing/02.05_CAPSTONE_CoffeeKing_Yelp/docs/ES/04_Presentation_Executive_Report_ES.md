@@ -1,7 +1,12 @@
 # ☕ CoffeeKing Analytics: Estrategia de Expansión Basada en Datos
+
+[English versiON](\docs\EN\04_Presentation_Executive_Report_EN.md)
+
 **Informe Final de Ingeniería de Datos para la Dirección General**
-[English versiON](\02.05_CAPSTONE_CoffeeKing_Yelp\docs\EN\04_Presentation_Executive_Report_EN.md)
+
 ---
+
+
 
 ## 👨‍💼 1. Resumen Ejecutivo
 Este proyecto surge de la necesidad de transformar el proceso de apertura de nuevas sucursales de **CoffeeKing**. Utilizando el dataset de Yelp (procesado mediante una arquitectura de datos modular), hemos pasado de decisiones basadas en la intuición a una **estrategia de inversión basada en evidencia**.

@@ -4,10 +4,10 @@
 ## 📌 1. Estructura del Proyecto y Metodología
 Este proyecto sigue un enfoque de ingeniería modular para asegurar la trazabilidad entre el negocio y el código:
 
-* **[FASE 01] Propuesta de Proyecto:** Definición del problema, selección del dataset y planteamiento de hipótesis (Ver `/docs/ES/01_Propuesta_Proyecto_CoffeeKing_ES.pdf`).
-* **[FASE 02] Análisis de Hipótesis:** Validación técnica mediante SQL avanzado y estadística descriptiva (Ver `/scripts/02_Descriptive_Analysis.sql`).
-* **[FASE 03] Análisis Avanzado y Métricas:** Identificación de correlaciones, implementación de KPIs (PEI/CP) y preparación para procesamiento de texto (Ver `/docs/ES/03_Deep_Analysis_Insights_ES.md` y `/scripts/03_New_Metrics_Implementation.sql`).
-* **[FASE 04] Informe Ejecutivo Final:** Consolidación de hallazgos estratégicos, validación final de KPIs (PEI/CP) y presentación de recomendaciones para la Dirección General. Cierre del ciclo de ingeniería relacional. (Ver `/docs/ES/04_Executive_Report_CoffeeKing_ES.md`).
+* **[FASE 01] Propuesta de Proyecto:** Definición del problema, selección del dataset y planteamiento de hipótesis [(Ver: 01_Propuesta_Proyecto_CoffeeKing_ES.pdf)](/docs/ES/01_Propuesta_Proyecto_CoffeeKing_ES.pdf).
+* **[FASE 02] Análisis de Hipótesis:** Validación técnica mediante SQL avanzado y estadística descriptiva [(Ver: /scripts/02a_H1_Rating_Stability.sql)](/scripts/02a_H1_Rating_Stability.sql) ; [(Ver: /scripts/02b_H2_Temporal_Behavior.sql) ](/scripts/02b_H2_Temporal_Behavior.sql) ; [(Ver: /scripts/02c_H3_Analysis.sql)](/scripts/02c_H3_Analysis.sql.sql).
+* **[FASE 03] Análisis Avanzado y Métricas:** Identificación de correlaciones, implementación de KPIs (PEI/CP) y preparación para procesamiento de texto [(Ver: /docs/ES/03_Deep_Analysis_Insights_ES.md)](/docs/ES/03_Deep_Analysis_Insights_ES.md) y [(Ver: /scripts/03_New_Metrics_Implementation.sql)](/scripts/03_New_Metrics_Implementation.sql).
+* **[FASE 04] Informe Ejecutivo Final:** Consolidación de hallazgos estratégicos, validación final de KPIs (PEI/CP) y presentación de recomendaciones para la Dirección General. Cierre del ciclo de ingeniería relacional. [(Ver: 04_Executive_Report_CoffeeKing_ES.md)](/docs/ES/04_Executive_Report_CoffeeKing_ES.md).
 
 ## 🛠️ 2. Stack Tecnológico Utilizado
 * **Base de Datos:** SQLite (`CoffeeKing_Yelp.db`).

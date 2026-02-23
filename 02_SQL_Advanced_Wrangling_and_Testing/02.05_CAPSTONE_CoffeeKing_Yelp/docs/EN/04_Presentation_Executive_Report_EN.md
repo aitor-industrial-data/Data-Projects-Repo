@@ -1,7 +1,10 @@
 # ☕ CoffeeKing Analytics: Data-Driven Expansion Strategy
+
+[Versión en Español](\docs\ES\04_Presentation_Executive_Report_ES.md)
+
 **Final Data Engineering Report for Executive Management**
 
-[Versión en Español](\02.05_CAPSTONE_CoffeeKing_Yelp\docs\ES\04_Presentation_Executive_Report_ES.md)
+
 
 ---
 
