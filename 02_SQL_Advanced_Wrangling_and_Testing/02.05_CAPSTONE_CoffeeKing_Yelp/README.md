@@ -1,12 +1,13 @@
 # CoffeeKing Analytics: Optimización de Inversión en Cafeterías (Yelp Dataset)
+[English Version](README_EN.md)
 
 ## 📌 1. Estructura del Proyecto y Metodología
 Este proyecto sigue un enfoque de ingeniería modular para asegurar la trazabilidad entre el negocio y el código:
 
 * **[FASE 01] Propuesta de Proyecto:** Definición del problema, selección del dataset y planteamiento de hipótesis (Ver `/docs/ES/01_Propuesta_Proyecto_CoffeeKing_ES.pdf`).
 * **[FASE 02] Análisis de Hipótesis:** Validación técnica mediante SQL avanzado y estadística descriptiva (Ver `/scripts/02_Descriptive_Analysis.sql`).
-* **[FASE 03] Análisis Avanzado y Métricas:** Identificación de correlaciones, implementación de KPIs (PEI/CP) y preparación para procesamiento de texto (Ver `/docs/03_Deep_Analysis_Insights.md` y `/scripts/03_New_Metrics_Implementation.sql`).
-* **[FASE 04] Informe Ejecutivo Final:** Consolidación de hallazgos estratégicos, validación final de KPIs (PEI/CP) y presentación de recomendaciones para la Dirección General. Cierre del ciclo de ingeniería relacional. (Ver `/docs/04_Executive_Report_CoffeeKing.md`).
+* **[FASE 03] Análisis Avanzado y Métricas:** Identificación de correlaciones, implementación de KPIs (PEI/CP) y preparación para procesamiento de texto (Ver `/docs/ES/03_Deep_Analysis_Insights_ES.md` y `/scripts/03_New_Metrics_Implementation.sql`).
+* **[FASE 04] Informe Ejecutivo Final:** Consolidación de hallazgos estratégicos, validación final de KPIs (PEI/CP) y presentación de recomendaciones para la Dirección General. Cierre del ciclo de ingeniería relacional. (Ver `/docs/ES/04_Executive_Report_CoffeeKing_ES.md`).
 
 ## 🛠️ 2. Stack Tecnológico Utilizado
 * **Base de Datos:** SQLite (`CoffeeKing_Yelp.db`).
@@ -18,6 +19,9 @@ Este proyecto sigue un enfoque de ingeniería modular para asegurar la trazabili
 * `/scripts/`: SQL Scripts (`02a_H1_Rating_Stability.sql`, `02b_H2_Temporal_Behavior.sql`, etc.)
 * `/docs/`: Informes detallados y propuesta del proyecto.
 * `/data/`: (No subido a GitHub) Base de datos local `CoffeeKing_Yelp.db`.
+* `/images/`: Diagramas del modelo de datos y documentación visual. <details style="display:inline"><summary><b>Ver Diagrama de Entidad-Relación (ERD)</b></summary><br><img src="./images/01_CoffeeKing_Yelp_Diagram.png" alt="Database Schema" width="800"></details>
+
+
 
 ## 📊 4. Hallazgos Críticos y Validación de Hipótesis
 Tras completar el análisis descriptivo y la correlación de atributos mediante SQL avanzado, se han contrastado las hipótesis iniciales con los siguientes resultados:
@@ -111,8 +115,6 @@ Aunque el alcance actual del proyecto CoffeeKing finaliza con la validación en 
 * **Robot ETL en Python:** Creación de un pipeline automatizado para la extracción, transformación y carga de datos de forma recurrente.
 * **Orquestación en la Nube:** Despliegue de flujos de trabajo en AWS/Azure utilizando **Airflow** para garantizar un sistema de ingeniería de datos 100% remoto, robusto y profesional.
 
----
-> **Nota técnica:** Este Roadmap describe las fases de especialización previstas para los modulos 3 a 6 del plan de formación "Data Engineer Pro", extendiendo las capacidades actuales de análisis relacional hacia la ingeniería de datos a escala industrial.
 
 
 
