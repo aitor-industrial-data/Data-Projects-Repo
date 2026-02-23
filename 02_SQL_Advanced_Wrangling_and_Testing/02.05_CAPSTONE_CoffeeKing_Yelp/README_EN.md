@@ -6,22 +6,22 @@ This project follows a modular engineering approach to ensure traceability betwe
 
 * **[PHASE 01] Project Proposal:** Problem definition, dataset selection, and hypothesis formulation.
 
-    [See: 01_CoffeeKing_Project_Proposal_EN.pdf](/docs/EN/01_CoffeeKing_Project_Proposal_EN.pdf).
+    [See: 01_CoffeeKing_Project_Proposal_EN.pdf](/02_SQL_Advanced_Wrangling_and_Testing/02.05_CAPSTONE_CoffeeKing_Yelp/docs/EN/01_CoffeeKing_Project_Proposal_EN.pdf).
 * **[PHASE 02] Hypothesis Analysis:** Technical validation through advanced SQL and descriptive statistics.
 
-    [See: /scripts/02a_H1_Rating_Stability.sql](/scripts/02a_H1_Rating_Stability.sql)
+    [See: /scripts/02a_H1_Rating_Stability.sql](/02_SQL_Advanced_Wrangling_and_Testing/02.05_CAPSTONE_CoffeeKing_Yelp/scripts/02a_H1_Rating_Stability.sql)
 
-    [See: /scripts/02b_H2_Temporal_Behavior.sql](/scripts/02b_H2_Temporal_Behavior.sql)
+    [See: /scripts/02b_H2_Temporal_Behavior.sql](/02_SQL_Advanced_Wrangling_and_Testing/02.05_CAPSTONE_CoffeeKing_Yelp/scripts/02b_H2_Temporal_Behavior.sql)
 
-    [See: /scripts/02c_H3_Analysis.sql](/scripts/02c_H3_Analysis.sql.sql)
+    [See: /scripts/02c_H3_Analysis.sql](/02_SQL_Advanced_Wrangling_and_Testing/02.05_CAPSTONE_CoffeeKing_Yelp/scripts/02c_H3_Analysis.sql.sql)
 * **[PHASE 03] Advanced Analysis & Metrics:** Correlation identification, KPI implementation (PEI/CP), and text processing preparation.
 
-    [See: /docs/EN/03_Deep_Analysis_Insights_EN.md](/docs/EN/03_Deep_Analysis_Insights_EN.md)
+    [See: /docs/EN/03_Deep_Analysis_Insights_EN.md](/02_SQL_Advanced_Wrangling_and_Testing/02.05_CAPSTONE_CoffeeKing_Yelp/docs/EN/03_Deep_Analysis_Insights_EN.md)
 
-    [See: /scripts/03_New_Metrics_Implementation.sql](/scripts/03_New_Metrics_Implementation.sql)
+    [See: /scripts/03_New_Metrics_Implementation.sql](/02_SQL_Advanced_Wrangling_and_Testing/02.05_CAPSTONE_CoffeeKing_Yelp/scripts/03_New_Metrics_Implementation.sql)
 * **[PHASE 04] Final Executive Report:** Consolidation of strategic findings, final KPI validation (PEI/CP), and management recommendations. Completion of the relational engineering cycle.
 
-    [See: 04_Executive_Report_CoffeeKing_EN.md](/docs/EN/04_Executive_Report_CoffeeKing_EN.md).
+    [See: 04_Executive_Report_CoffeeKing_EN.md](/02_SQL_Advanced_Wrangling_and_Testing/02.05_CAPSTONE_CoffeeKing_Yelp/docs/EN/04_Executive_Report_CoffeeKing_EN.md).
 
 ## 🛠️ 2. Tech Stack
 * **Database:** SQLite (`CoffeeKing_Yelp.db`).

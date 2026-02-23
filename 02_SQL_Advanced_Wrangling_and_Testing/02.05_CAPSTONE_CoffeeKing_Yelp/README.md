@@ -6,22 +6,22 @@ Este proyecto sigue un enfoque de ingeniería modular para asegurar la trazabili
 
 * **[FASE 01] Propuesta de Proyecto:** Definición del problema, selección del dataset y planteamiento de hipótesis.
 
-    [Ver: 01_Propuesta_Proyecto_CoffeeKing_ES.pdf](/docs/ES/01_Propuesta_Proyecto_CoffeeKing_ES.pdf).
+    [Ver: 01_Propuesta_Proyecto_CoffeeKing_ES.pdf](/02_SQL_Advanced_Wrangling_and_Testing/02.05_CAPSTONE_CoffeeKing_Yelp/docs/ES/01_Propuesta_Proyecto_CoffeeKing_ES.pdf).
 * **[FASE 02] Análisis de Hipótesis:** Validación técnica mediante SQL avanzado y estadística descriptiva.
 
-    [Ver: 02a_H1_Rating_Stability.sql](/scripts/02a_H1_Rating_Stability.sql)
+    [Ver: 02a_H1_Rating_Stability.sql](/02_SQL_Advanced_Wrangling_and_Testing/02.05_CAPSTONE_CoffeeKing_Yelp/scripts/02a_H1_Rating_Stability.sql)
 
-    [Ver: 02b_H2_Temporal_Behavior.sql](/scripts/02b_H2_Temporal_Behavior.sql)
+    [Ver: 02b_H2_Temporal_Behavior.sql](/02_SQL_Advanced_Wrangling_and_Testing/02.05_CAPSTONE_CoffeeKing_Yelp/scripts/02b_H2_Temporal_Behavior.sql)
 
-    [Ver: 02c_H3_Analysis.sql](/scripts/02c_H3_Analysis.sql.sql).
+    [Ver: 02c_H3_Analysis.sql](/02_SQL_Advanced_Wrangling_and_Testing/02.05_CAPSTONE_CoffeeKing_Yelp/scripts/02c_H3_Analysis.sql.sql).
 * **[FASE 03] Análisis Avanzado y Métricas:** Identificación de correlaciones, implementación de KPIs (PEI/CP) y preparación para procesamiento de texto.
 
-    [Ver: 03_Deep_Analysis_Insights_ES.md](/docs/ES/03_Deep_Analysis_Insights_ES.md)
+    [Ver: 03_Deep_Analysis_Insights_ES.md](/02_SQL_Advanced_Wrangling_and_Testing/02.05_CAPSTONE_CoffeeKing_Yelp/docs/ES/03_Deep_Analysis_Insights_ES.md)
 
-    [Ver: 03_New_Metrics_Implementation.sql](/scripts/03_New_Metrics_Implementation.sql).
+    [Ver: 03_New_Metrics_Implementation.sql](/02_SQL_Advanced_Wrangling_and_Testing/02.05_CAPSTONE_CoffeeKing_Yelp/scripts/03_New_Metrics_Implementation.sql).
 * **[FASE 04] Informe Ejecutivo Final:** Consolidación de hallazgos estratégicos, validación final de KPIs (PEI/CP) y presentación de recomendaciones para la Dirección General. Cierre del ciclo de ingeniería relacional.
 
-    [Ver: 04_Executive_Report_CoffeeKing_ES.md](/docs/ES/04_Executive_Report_CoffeeKing_ES.md).
+    [Ver: 04_Executive_Report_CoffeeKing_ES.md](/02_SQL_Advanced_Wrangling_and_Testing/02.05_CAPSTONE_CoffeeKing_Yelp/docs/ES/04_Executive_Report_CoffeeKing_ES.md).
 
 ## 🛠️ 2. Stack Tecnológico Utilizado
 * **Base de Datos:** SQLite (`CoffeeKing_Yelp.db`).
