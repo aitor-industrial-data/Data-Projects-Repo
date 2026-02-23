@@ -21,7 +21,7 @@ This project follows a modular engineering approach to ensure traceability betwe
     [See: /scripts/03_New_Metrics_Implementation.sql](/02_SQL_Advanced_Wrangling_and_Testing/02.05_CAPSTONE_CoffeeKing_Yelp/scripts/03_New_Metrics_Implementation.sql)
 * **[PHASE 04] Final Executive Report:** Consolidation of strategic findings, final KPI validation (PEI/CP), and management recommendations. Completion of the relational engineering cycle.
 
-    [See: 04_Executive_Report_CoffeeKing_EN.md](/02_SQL_Advanced_Wrangling_and_Testing/02.05_CAPSTONE_CoffeeKing_Yelp/docs/EN/04_Executive_Report_CoffeeKing_EN.md).
+    [See: 04_Executive_Report_CoffeeKing_EN.md](/02_SQL_Advanced_Wrangling_and_Testing/02.05_CAPSTONE_CoffeeKing_Yelp/docs/EN/04_Presentation_Executive_Report_EN.md).
 
 ## 🛠️ 2. Tech Stack
 * **Database:** SQLite (`CoffeeKing_Yelp.db`).
