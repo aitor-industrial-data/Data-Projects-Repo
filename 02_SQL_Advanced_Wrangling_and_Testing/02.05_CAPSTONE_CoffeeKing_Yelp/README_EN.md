@@ -1,6 +1,8 @@
 # CoffeeKing Analytics: Coffee Shop Investment Optimization (Yelp Dataset)
 [Versión en Español](README.md)
 
+This repository contains the final project for the **SQL Basics for Data Science Specialization**, issued by the **University of California, Davis**.
+
 ## 📌 1. Project Structure and Methodology
 This project follows a modular engineering approach to ensure traceability between business requirements and code:
 

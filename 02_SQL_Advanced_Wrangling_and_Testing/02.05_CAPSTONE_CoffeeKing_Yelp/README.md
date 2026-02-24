@@ -1,6 +1,8 @@
 # CoffeeKing Analytics: Optimización de Inversión en Cafeterías (Yelp Dataset)
 [English Version](README_EN.md)
 
+Este repositorio contiene el proyecto final del **Certificado de Especialización en SQL Basics for Data Science** de la **Universidad de California, Davis**.
+
 ## 📌 1. Estructura del Proyecto y Metodología
 Este proyecto sigue un enfoque de ingeniería modular para asegurar la trazabilidad entre el negocio y el código:
 

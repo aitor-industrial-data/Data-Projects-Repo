@@ -1,6 +1,6 @@
 # ☕ CoffeeKing Analytics: Estrategia de Expansión Basada en Datos
 
-[English versiON](/02_SQL_Advanced_Wrangling_and_Testing/02.05_CAPSTONE_CoffeeKing_Yelp/docs/EN/04_Presentation_Executive_Report_EN.md)
+[English version](/02_SQL_Advanced_Wrangling_and_Testing/02.05_CAPSTONE_CoffeeKing_Yelp/docs/EN/04_Presentation_Executive_Report_EN.md)
 
 **Informe Final de Ingeniería de Datos para la Dirección General**
 
