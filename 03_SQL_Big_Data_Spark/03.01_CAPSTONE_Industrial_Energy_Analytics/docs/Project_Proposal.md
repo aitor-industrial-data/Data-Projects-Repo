@@ -41,7 +41,7 @@ Durante la fase inicial de ingesta de datos, se realizó un proceso de validaci�
 
 Como Ingeniero Tecnico Industrial Electrico, el análisis se centrará en validar tres escenarios críticos:
 
-* **H1 (Optimización de la Curva de Carga y Simultaneidad):** La instalación registra picos de demanda máxima vinculados a una elevada **tasa de simultaneidad** de equipos de gran potencia (climatización, bombeo de piscina y electrodomésticos térmicos). Utilizaremos la capacidad de procesamiento de Spark para identificar las **ventanas críticas de demanda** donde la coincidencia de uso dispara el término de potencia por encima de los 9 kW. El análisis busca determinar si estos picos son evitables mediante un **escalonamiento de cargas** (arranque secuencial) o una reprogramación de hábitos, permitiendo así una reducción de la potencia contratada sin sacrificar el confort."
+* **H1 (Optimización de la Curva de Carga y Simultaneidad):** La instalación registra picos de demanda máxima vinculados a una elevada **tasa de simultaneidad** de equipos de gran potencia (Sub_metering_3 climatización). Utilizaremos la capacidad de procesamiento de Spark para identificar las **ventanas críticas de demanda** donde la coincidencia de uso dispara el término de potencia por encima de los 8 kW. El análisis busca determinar si estos picos son evitables mediante un **escalonamiento de cargas** (arranque secuencial) o una reprogramación de hábitos, permitiendo así una reducción de la potencia contratada sin sacrificar el confort."
 
 * **H2 (Análisis del Consumo Residual y Eficiencia Pasiva):** "El ratio de **consumo base (Standby)** frente al consumo nominal es superior al 15% durante los periodos de inactividad o descanso (madrugadas y días no laborables). Esta hipótesis busca cuantificar el impacto económico de los **sistemas auxiliares y cargas fantasma** (sistemas de seguridad, recirculación de agua, climatización en modo espera y domótica) que no están optimizados para el ahorro energético pasivo. Utilizaremos la comparativa entre días laborables y fines de semana para determinar si el consumo base es constante o si existen ineficiencias por falta de protocolos de 'apagado inteligente' en la vivienda."
 
@@ -67,7 +67,7 @@ Como Ingeniero Tecnico Industrial Electrico, el análisis se centrará en valida
    * **Ventanas de Maximímetro:** Cálculo de medias móviles para identificar la **ventana crítica de simultaneidad**, simulando el comportamiento de un contador inteligente profesional en la detección de picos.
 
 4. **Fase 4: Analítica Spark SQL (Validación de Hipótesis)**
-   * Identificación de eventos > 9 kW para proponer un **escalonamiento de cargas** y reducir la potencia contratada. (H1).
+   * Identificación de eventos > 8 kW para proponer un **escalonamiento de cargas** y reducir la potencia contratada. (H1).
    * Cuantificación del **gasto en standby** durante madrugadas y fines de semana para optimización domótica (H2).
    * Detección de caídas de voltaje (< 210V) ante picos de demanda para prevenir **fatiga electrónica** en la vivienda (H3).
 
