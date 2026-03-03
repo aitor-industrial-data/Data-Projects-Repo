@@ -1,11 +1,5 @@
 
-# <p align="center" style="background-color: #1f4287; color: white; padding: 10px; border-radius: 5px;"> FINAL REPORT: Industrial Energy Analytics (Spark Capstone) </p>
-
-
-> # FINAL REPORT: Industrial Energy Analytics (Spark Capstone)
-
-# Industrial Energy Analytics 
-***
+> # 🏁 FINAL REPORT: Industrial Energy Analytics
 
 ## Índice
 
@@ -18,7 +12,9 @@
 7. [Entregables Técnicos y Configuración](#7-entregables-técnicos-y-configuración)
 
 
-## <p style="background-color: #1f4287; color: white; padding: 10px; border-radius: 5px;"> 1. Resumen Ejecutivo </p>
+
+
+>## 1. Resumen Ejecutivo 
 
 El presente informe técnico documenta el desarrollo y los resultados de un ecosistema de procesamiento masivo de datos diseñado para el análisis del consumo eléctrico residencial. El proyecto se basa en la explotación de un dataset histórico que comprende **2.075.259 registros** capturados con una frecuencia de muestreo de un minuto entre los años 2006 y 2010.
 
@@ -33,7 +29,7 @@ La finalidad primordial de esta implementación es la construcción de un pipeli
 Bajo la metodología de un Ingeniero Técnico Industrial, el proyecto trasciende el análisis estadístico simple para centrarse en la integridad del sistema. Utilizando **Apache Spark** como motor de computación distribuida, se garantiza una arquitectura que permite el procesamiento de millones de filas con latencia mínima. Este enfoque asegura que el sistema sea capaz de escalar desde una unidad habitacional hasta el entorno de una red eléctrica inteligente (Smart Grid), manteniendo la precisión técnica y la paridad con entornos de producción mediante el uso de entornos **Linux nativos sobre WSL2 y VS Code Remote.**
 
 
-## <p style="background-color: #1f4287; color: white; padding: 10px; border-radius: 5px;"> 2. Arquitectura de Datos (Diseño Estructural) </p>
+>## 2. Arquitectura de Datos (Diseño Estructural)
 
 La arquitectura del sistema ha sido diseñada para maximizar el rendimiento del hardware Intel Core i5-1334U, garantizando un entorno de procesamiento de baja latencia mediante la integración de tecnologías Linux en entorno Windows.
 
@@ -67,7 +63,7 @@ A diferencia de los sistemas transaccionales (OLTP) que utilizan un Modelo Relac
 * **Latencia Mínima:** Al tener el Full_Timestamp, las dimensiones temporales y las métricas eléctricas en una misma fila, Spark puede realizar agregaciones y cálculos de ventana de forma lineal y extremadamente rápida.
 
 
-## <p style="background-color: #1f4287; color: white; padding: 10px; border-radius: 5px;"> 3. ETL y Transformación de Datos </p>
+>## 3. ETL y Transformación de Datos
 
 En esta fase se transforma el dataset bruto en un activo de información de alta calidad. La ingeniería aplicada se centra en eliminar el ruido industrial y enriquecer los datos para permitir análisis temporales complejos.
 
@@ -141,7 +137,7 @@ Tras este proceso de ETL, el volumen de registros listos para el análisis se ma
 </table>
 
 
-## <p style="background-color: #1f4287; color: white; padding: 10px; border-radius: 5px;"> 4. Benchmarking de Rendimiento y Escalabilidad </p>
+>## 4. Benchmarking de Rendimiento y Escalabilidad
 
 Este apartado documenta la eficiencia del pipeline y su capacidad para operar bajo condiciones de alta carga, aprovechando las especificaciones técnicas del hardware MEDION E15433.
 
@@ -164,9 +160,9 @@ Este proyecto ha sido desarrollado bajo el principio de escalabilidad horizontal
 * **Eficiencia de Almacenamiento:** El uso del formato Parquet asegura que, al subir el volumen de datos, el costo de almacenamiento y el tiempo de lectura se mantengan optimizados mediante la compresión Snappy y la lectura de columnas específicas.
 
 
-## <p style="background-color: #1f4287; color: white; padding: 10px; border-radius: 5px;"> 5. Validación de Hipótesis (Resultados de Negocio) </p>
+>## 5. Validación de Hipótesis (Resultados de Negocio)
 
-### <span style="color: #2e67bd; margin-right: 10px;">●</span> Hipótesis 1: Optimización de la Curva de Carga y Simultaneidad
+### Hipótesis 1: Optimización de la Curva de Carga y Simultaneidad
 * **Objetivo:** Identificar si los picos máximos de demanda (eventos críticos > 8 kW) responden a una necesidad real de potencia instalada o si son fruto de una elevada tasa de simultaneidad de cargas desplazables. El objetivo de negocio es validar si es técnicamente seguro reducir la potencia contratada a 6.9 kW.
 
 * **Técnica:** Para validar esta hipótesis, se utilizó el motor de Spark SQL y funciones de agregación sobre el dataset de 2.07 millones de registros:
@@ -193,7 +189,7 @@ El análisis masivo confirma que la instalación está sobredimensionada. Los pi
 
 ---
 
-### <span style="color: #2e67bd; margin-right: 10px;">●</span> Hipótesis 2: Análisis de Outliers Estadísticos (3sigma)
+### Hipótesis 2: Análisis de Outliers Estadísticos (3sigma)
 * **Objetivo:** Identificar anomalías de consumo en el circuito de Cocina (S1) que se desvíen significativamente de la media histórica. El objetivo técnico es detectar eventos superiores a 2500W que ocurran fuera de las franjas horarias de uso estándar (madrugada), utilizando funciones de ventana para diferenciar entre demanda legítima y fallos operativos o descuidos.
 
 * **Técnica:** La detección se realizó mediante un enfoque estadístico robusto implementado en Spark:
@@ -220,7 +216,7 @@ El análisis identifica un incidente por factor humano (olvido operativo) de alt
 
 ---
 
-### <span style="color: #2e67bd; margin-right: 10px;">●</span> Hipótesis 3: Análisis del Consumo Residual y Eficiencia Pasiva
+### Hipótesis 3: Análisis del Consumo Residual y Eficiencia Pasiva
 
 * **Objetivo:** Determinar si el consumo base (Standby) durante periodos de inactividad (madrugadas y días no laborables) supera el 15% del consumo nominal. El objetivo es identificar ineficiencias estructurales ("cargas fantasma") y proponer protocolos de ahorro pasivo mediante la segmentación de datos temporales.
 
@@ -249,7 +245,7 @@ La hipótesis se valida con un resultado de 37.66%, duplicando con creces el umb
 
     ---
 
-### <span style="color: #2e67bd; margin-right: 10px;">●</span> Hipótesis 4: Diagnóstico de Calidad de Suministro y Estabilidad de Tensión
+### Hipótesis 4: Diagnóstico de Calidad de Suministro y Estabilidad de Tensión
 
 * **Objetivo:** Evaluar la relación entre el consumo de potencia y la estabilidad del voltaje nominal para identificar riesgos de fatiga en componentes electrónicos. El objetivo es determinar si las caídas de tensión son de origen interno (mala instalación) o externo (saturación de la red de distribución), cuantificando el tiempo de exposición a la "Zona de Estrés" (<228V).
 
@@ -276,7 +272,7 @@ La hipótesis se valida con un resultado de 37.66%, duplicando con creces el umb
     * **Optimización de Capex:** Se evita una inversión innecesaria en el re-cableado de la vivienda, ya que el análisis de datos demuestra que la infraestructura interna es sobresaliente.
 
 
-## <p style="background-color: #1f4287; color: white; padding: 10px; border-radius: 5px;"> 6. Conclusiones globales: Auditoría Energética de Alta Precisión </p>
+>## 6. Conclusiones globales: Auditoría Energética de Alta Precisión
 
 Tras el procesamiento distribuido de más de **2 millones de registros** mediante el motor de cómputo **Apache Spark**, se presenta la síntesis final del comportamiento eléctrico de la unidad bajo estudio. Este análisis trasciende el monitoreo convencional para convertirse en una **auditoría forense de alta precisión**, permitiendo segmentar el gasto, mitigar riesgos técnicos y maximizar el ahorro económico.
 
@@ -333,7 +329,7 @@ Para escalar este proyecto al siguiente nivel de Data Engineering, se proponen l
 * **Acción Pericial:** Utilizar el informe técnico generado por Spark para exigir a la distribuidora una auditoría con instrumental de Clase A, basándose en la exposición recurrente a la fatiga térmica detectada en los 2 millones de registros.
 
 
-## <span style="background-color: #1f4287; color: white; padding: 10px; border-radius: 5px; display: block;"> 7. Entregables Técnicos y Configuración </span>
+>## 7. Entregables Técnicos y Configuración </span>
 
 * **Notebook Principal:** [`notebooks/project_notebook.ipynb`](../notebooks/01_EDA_Electric_Data.ipynb)
 * **Datos de Salida:** [`data_storage/work/`](../data_storage/work/) (Contiene los archivos Parquet/CSV procesados por Spark).
