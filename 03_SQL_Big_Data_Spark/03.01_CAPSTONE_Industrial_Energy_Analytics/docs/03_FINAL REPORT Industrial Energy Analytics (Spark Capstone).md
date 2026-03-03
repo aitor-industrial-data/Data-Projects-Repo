@@ -311,7 +311,7 @@ El análisis revela una instalación con una excelente salud de infraestructura 
 ### 2. Mitigación de Riesgos y Seguridad de Activos
 La identificación forense del evento del horno (**H2**) demuestra que el riesgo no es técnico (averías), sino de comportamiento. Integrar algoritmos de detección de anomalías basados en las firmas eléctricas obtenidas permitiría implementar sistemas de **Smart Home** que corten el suministro ante patrones de olvido, protegiendo la instalación de estreses térmicos innecesarios como el detectado (83% de capacidad nominal durante 4 horas).
 
-## 6.3 Optimización Financiera (Cost-Benefit Analysis)
+### 6.3 Optimización Financiera (Cost-Benefit Analysis)
 La estrategia propuesta se divide en dos ejes:
 
 * **Ahorro Pasivo:** La reducción de potencia contratada a 6.9 kW (H1) se define como una medida de CapEx 0 (inversión cero). Al demostrar mediante el análisis de simultaneidad que el umbral de 10 kW es innecesario, se genera un ahorro neto en el término fijo de la factura de forma inmediata y recurrente.
@@ -320,7 +320,7 @@ La estrategia propuesta se divide en dos ejes:
     * **Gestión de Standby Residual:** Instalación de Smart Kill-Switches para eliminar el suelo de 0.20 kW en circuitos generales. Esta medida es la única vía para alcanzar el objetivo técnico de 0.15 kW de consumo basal.
 
 
-## 6.4 Roadmap de Implementación Recomendado
+### 6.4 Roadmap de Implementación Recomendado
 Basado en la evidencia de los datos, el plan de acción post-notebook es:
 
 **Inmediato (Gestión de Suministro y Carga):**
@@ -335,7 +335,7 @@ Basado en la evidencia de los datos, el plan de acción post-notebook es:
 * **Eliminación de "Cargas Fantasma":** Implementar Smart Kill-Switches para erradicar el suelo de standby de 0.20 kW, bajando el ratio del 37% al <10%.
 * **Acción Legal Basada en estudio de datos (H4):** Generación de un informe técnico pericial fundamentado en el procesamiento de 2.075.259 registros mediante Big Data Spark. La evidencia central es la exposición recurrente a la "Zona de Estrés" (<228V), detectada especialmente en franjas de baja carga interna. Se alega que, aunque los promedios minutales son legales, suponen la "punta del iceberg" de fluctuaciones instantáneas mucho más graves (sospecha de caídas a <215V) que la granularidad actual oculta. Este informe técnico servirá para exigir a la distribuidora una auditoría con instrumental de Clase A y el reajuste del transformador, basándose en la degradación por fatiga térmica acumulada en los equipos de la vivienda.
 
-## 6.5 Roadmap y Escalabilidad del Proyecto
+### 6.5 Roadmap de Escalabilidad del Proyecto
 Para escalar este proyecto al siguiente nivel de Data Engineering, se proponen las siguientes fases:
 * **Automatización (Data Pipeline):** Migrar este análisis local a un orquestador como Apache Airflow (objetivo del Mes 6) para procesar nuevos logs de telemetría de forma diaria y automática.
  * **Dashboarding en Tiempo Real:** Integrar el "Golden Dataset" generado en Spark con una herramienta de visualización (Grafana o Power BI) para monitorizar el consumo en tiempo real y emitir alertas de "Zona de Estrés" (H4).
@@ -366,6 +366,6 @@ Asegúrate de tener instalado PySpark en tu entorno de Ubuntu:
         ```
 * 3. Ejecución en VS Code
     * Abrir la carpeta del proyecto en VS Code (asegúrate de que el indicador azul abajo a la izquierda diga WSL: Ubuntu).
-    * Abrir el archivo `notebooks/project_notebook.ipynb`.
+    * Abrir el archivo `notebooks/01_EDA_Electric_Data.ipynb`.
     * Seleccionar el Kernel de Python de tu entorno de Ubuntu.
     * Ejecutar todas las celdas para procesar los registros y generar los resultados.

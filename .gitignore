@@ -1,12 +1,12 @@
 # Ignorar el archivo de base de datos de SQLite
 *.db
 *.sqlite
-#*.csv
+*.csv
 
 # Ignorar carpetas con datos locales
 /01_SQL_Fundamentals/database_storage/
 /01_SQL_Fundamentals/database_storage/01.02_CAPSTONE_UC_Davis_Agriculture_Project/database_storage/
 /02_SQL_Advanced_Wrangling_and_Testing/database_storage/
-/03_SQL_Big_Data_Spark/03.01_CAPSTONE_Industrial_Energy_Analytics/data_storage/source/
+/03_SQL_Big_Data_Spark/03.01_CAPSTONE_Industrial_Energy_Analytics/data_storage/
 /03_SQL_Big_Data_Spark/03.01_CAPSTONE_Industrial_Energy_Analytics/notebooks/.ipynb_checkpoints/
 /99_SQL_Practices_Chinook/database_storage/
