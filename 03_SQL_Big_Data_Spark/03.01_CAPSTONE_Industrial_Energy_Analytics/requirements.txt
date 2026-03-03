@@ -1,4 +1,0 @@
-pyspark==3.5.0
-matplotlib
-pandas
-findspark

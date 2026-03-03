@@ -325,8 +325,8 @@ Para escalar este proyecto al siguiente nivel de Data Engineering, se proponen l
 
 ## 7. Entregables Técnicos y Configuración
 
-* **Notebook Principal:** [`notebooks/project_notebook.ipynb`](../notebooks/project_notebook.ipynb)
-* **Datos de Salida:** [`data_storage/work/`](../data_storage/work/) (Contiene los archivos Parquet/CSV procesados por Spark).
+* **Notebook Principal:** [`notebooks/project_notebook.ipynb`](../notebooks/01_EDA_Electric_Data.ipynb)
+* **Datos de Salida:** [`data_storage/work/`](../data_storage/work) (Contiene los archivos Parquet/CSV procesados por Spark).
 * **Documentación:** [`docs/`](./) (Esquemas, evidencias visuales e informe final).
 
 ### 7.1 Cómo Ejecutar (Guía de Inicio Rápido):**
