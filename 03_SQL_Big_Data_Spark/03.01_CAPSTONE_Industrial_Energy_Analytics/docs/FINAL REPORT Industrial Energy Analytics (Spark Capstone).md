@@ -171,3 +171,6 @@ El análisis masivo confirma que la instalación está sobredimensionada. Los pi
 
 * **Visual Evidence:** <br>
   ![Industrial Energy Analysis](./docs/H1_Frequency_LoadShift_Plot.png)
+
+  * **Visual Evidence:** <br>
+<img src="docs/H1_Frequency_LoadShift_Plot.png" alt="Industrial Energy Analysis" width="800">
