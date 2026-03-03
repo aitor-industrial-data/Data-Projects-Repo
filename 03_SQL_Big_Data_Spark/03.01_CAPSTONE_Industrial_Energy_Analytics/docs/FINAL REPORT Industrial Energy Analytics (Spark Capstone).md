@@ -1,7 +1,9 @@
 
 > # 🏁 FINAL REPORT: Industrial Energy Analytics
+---
+---
 
-## Índice
+>## Índice
 
 1. [Resumen Ejecutivo](#1-resumen-ejecutivo)
 2. [Arquitectura de Datos (Diseño Estructural)](#2-arquitectura-de-datos-diseño-estructural)
@@ -12,7 +14,8 @@
 7. [Entregables Técnicos y Configuración](#7-entregables-técnicos-y-configuración)
 
 
-
+---
+---
 
 >## 1. Resumen Ejecutivo 
 
@@ -28,6 +31,8 @@ La finalidad primordial de esta implementación es la construcción de un pipeli
 ### Enfoque de Ingeniería de Datos
 Bajo la metodología de un Ingeniero Técnico Industrial, el proyecto trasciende el análisis estadístico simple para centrarse en la integridad del sistema. Utilizando **Apache Spark** como motor de computación distribuida, se garantiza una arquitectura que permite el procesamiento de millones de filas con latencia mínima. Este enfoque asegura que el sistema sea capaz de escalar desde una unidad habitacional hasta el entorno de una red eléctrica inteligente (Smart Grid), manteniendo la precisión técnica y la paridad con entornos de producción mediante el uso de entornos **Linux nativos sobre WSL2 y VS Code Remote.**
 
+---
+---
 
 >## 2. Arquitectura de Datos (Diseño Estructural)
 
@@ -62,6 +67,8 @@ A diferencia de los sistemas transaccionales (OLTP) que utilizan un Modelo Relac
 * **Eficiencia en Spark:** En computación distribuida, los JOINs entre tablas son operaciones "costosas" (generan Shuffle de datos entre nodos). Al aplanar toda la información en una única tabla maestra (Flat Table), eliminamos la necesidad de cruces de datos en tiempo de ejecución.
 * **Latencia Mínima:** Al tener el Full_Timestamp, las dimensiones temporales y las métricas eléctricas en una misma fila, Spark puede realizar agregaciones y cálculos de ventana de forma lineal y extremadamente rápida.
 
+---
+---
 
 >## 3. ETL y Transformación de Datos
 
@@ -136,6 +143,8 @@ Tras este proceso de ETL, el volumen de registros listos para el análisis se ma
   </tr>
 </table>
 
+---
+---
 
 >## 4. Benchmarking de Rendimiento y Escalabilidad
 
@@ -159,6 +168,8 @@ Este proyecto ha sido desarrollado bajo el principio de escalabilidad horizontal
 * **Portabilidad de Entorno:** Al estar desarrollado sobre Linux, el pipeline garantiza la paridad total con servidores de producción en la nube.
 * **Eficiencia de Almacenamiento:** El uso del formato Parquet asegura que, al subir el volumen de datos, el costo de almacenamiento y el tiempo de lectura se mantengan optimizados mediante la compresión Snappy y la lectura de columnas específicas.
 
+---
+---
 
 >## 5. Validación de Hipótesis (Resultados de Negocio)
 
@@ -243,7 +254,7 @@ La hipótesis se valida con un resultado de 37.66%, duplicando con creces el umb
     * **Automatización (Smart Kill-Switch):** Se propone la instalación de relés inteligentes para eliminar el consumo residual de 0.20 kW en valles de inactividad, con el fin de reducir el ratio de standby al 12%.
     * **Impacto Financiero Total:** La corrección integral del consumo base (de 0.472 kW a 0.15 kW) generaría un ahorro anual aproximado de 2,800 kWh, maximizando la rentabilidad de la instalación.
 
-    ---
+---
 
 ### Hipótesis 4: Diagnóstico de Calidad de Suministro y Estabilidad de Tensión
 
@@ -271,6 +282,8 @@ La hipótesis se valida con un resultado de 37.66%, duplicando con creces el umb
     * **Protección de Activos:** Se justifica la inversión en SAIs de Doble Conversión para electrónica crítica y una reprogramación horaria para evitar sumar carga interna entre las 09:00 y las 12:00.
     * **Optimización de Capex:** Se evita una inversión innecesaria en el re-cableado de la vivienda, ya que el análisis de datos demuestra que la infraestructura interna es sobresaliente.
 
+---
+---
 
 >## 6. Conclusiones globales: Auditoría Energética de Alta Precisión
 
@@ -328,11 +341,13 @@ Para escalar este proyecto al siguiente nivel de Data Engineering, se proponen l
  * **Dashboarding en Tiempo Real:** Integrar el "Golden Dataset" generado en Spark con una herramienta de visualización (Grafana o Power BI) para monitorizar el consumo en tiempo real y emitir alertas de "Zona de Estrés" (H4).
 * **Acción Pericial:** Utilizar el informe técnico generado por Spark para exigir a la distribuidora una auditoría con instrumental de Clase A, basándose en la exposición recurrente a la fatiga térmica detectada en los 2 millones de registros.
 
+---
+---
 
->## 7. Entregables Técnicos y Configuración </span>
+>## 7. Entregables Técnicos y Configuración
 
 * **Notebook Principal:** [`notebooks/project_notebook.ipynb`](../notebooks/01_EDA_Electric_Data.ipynb)
-* **Datos de Salida:** [`data_storage/work/`](../data_storage/work/) (Contiene los archivos Parquet/CSV procesados por Spark).
+* **Datos de Salida:** `data_storage/work/` (Contiene los archivos Parquet/CSV procesados por Spark).
 * **Documentación:** [`docs/`](./) (Esquemas, evidencias visuales e informe final).
 
 ### 7.1 Cómo Ejecutar (Guía de Inicio Rápido):**
