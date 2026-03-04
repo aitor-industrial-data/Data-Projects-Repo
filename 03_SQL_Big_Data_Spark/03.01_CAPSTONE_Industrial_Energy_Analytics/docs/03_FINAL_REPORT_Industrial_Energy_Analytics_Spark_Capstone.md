@@ -162,7 +162,7 @@ A diferencia de un análisis de datos convencional, el pipeline se ha configurad
 
 ### 4.2. Performance Metrics
 * **Volumen Procesado:** 2,075,259 registros.
-* **Tiempo de Ejecución (ETL Completo):** 6,1 segundos.
+* **Tiempo de Ejecución (ETL Completo):** 17.3 segundos.
 * **Eficiencia de Ingesta:** Gracias al uso de naStrings='?' y la desnormalización (tabla aplanada), el acceso a cualquier métrica para las hipótesis (H1-H4) tiene una latencia mínima tras la primera carga.
 
 ### 4.3. Scalability Note (Hacia el entorno Cloud)
