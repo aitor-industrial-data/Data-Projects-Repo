@@ -1,4 +1,7 @@
-# Conclusiones globales: Auditoría Energética de Alta Precisión
+># Conclusiones globales: Auditoría Energética de Alta Precisión
+    Sector: Infraestructura Eléctrica e Ingeniería de Datos
+    Responsable: Aitor (Ingeniero Técnico Industrial)
+    Fecha: Febrero 2026
 
 Tras el procesamiento distribuido de más de **2 millones de registros** mediante el motor de cómputo **Apache Spark**, se presenta la síntesis final del comportamiento eléctrico de la unidad bajo estudio. Este análisis trasciende el monitoreo convencional para convertirse en una **auditoría forense de alta precisión**, permitiendo segmentar el gasto, mitigar riesgos técnicos y maximizar el ahorro económico.
 
@@ -6,12 +9,12 @@ Tras el procesamiento distribuido de más de **2 millones de registros** mediant
 ## 1. Comparativa de Impacto y Validación de Hipótesis
 A continuación, se tabula el impacto de cada vector de análisis sobre la operatividad y la eficiencia de la instalación:
 
-| Hipótesis | Estado | Factor Crítico Identificado | Impacto en Negocio / Ahorro | Relevancia Técnica |
-| :--- | :---: | :--- | :--- | :--- |
-| **H1: Simultaneidad** | ✅ Validada | Sobredimensionamiento estructural (Pico >10kW). | **Alto:** Reducción de término fijo al bajar a 6.9 kW. | Optimización de potencia contratada. |
-| **H2: Outliers (Horno)** | ✅ Validada | Factor Humano (Olvido operativo el 05/06/2010). | **Medio:** Prevención de desperdicio energético (72% de ahorro). | NIALM (Firma de carga del activo). |
-| **H3: Consumo Base** | ✅ **CRÍTICA** | Standby del **37.66%** (Ineficiencia masiva). | **Muy Alto:** Ahorro proyectado de **1,068 kWh/año**. | NILM: Desagregación de carga y perfilado de activos. |
-| **H4: Estabilidad** | ⚠️ Parcial | Deficiencia en Red Externa (Distribuidora). | **Bajo (Económico) / Alto (Activos):** Vida útil. | Diagnóstico de calidad de suministro. |
+| Hipótesis | Estado | Factor Crítico Identificado | Impacto en Negocio / Ahorro | Relevancia Técnica | Evidencia Gráfica |
+| :--- | :---: | :--- | :--- | :--- | :--- |
+| **H1: Simultaneidad** | ✅ Validada | Sobredimensionamiento estructural (Pico >10kW). | **Alto:** Reducción de término fijo al bajar a 6.9 kW. | Optimización de potencia contratada. | [`H1_Frequency_LoadShift_Plot`](./H1_Frequency_LoadShift_Plot.png) |
+| **H2: Outliers (Horno)** | ✅ Validada | Factor Humano (Olvido operativo el 05/06/2010). | **Medio:** Prevención de desperdicio energético (72% de ahorro). | NIALM (Firma de carga del activo). | [`H2_Oven_Incident_Power_Analysis.png`](./H2_Oven_Incident_Power_Analysis.png) |
+| **H3: Consumo Base** | ✅ **CRÍTICA** | Standby del **37.66%** (Ineficiencia masiva). | **Muy Alto:** Ahorro proyectado de **1,068 kWh/año**. | NILM: Desagregación de carga y perfilado de activos. | [`H3_NILM_Fridge_Signature.png`](./H3_NILM_Fridge_Signature.png) |
+| **H4: Estabilidad** | ⚠️ Parcial | Deficiencia en Red Externa (Distribuidora). | **Bajo (Económico) / Alto (Activos):** Vida útil. | Diagnóstico de calidad de suministro. | [`H4_correlation_stress.png`](./H4_correlation_stress.png) [`H4_root_cause_analysis.png`](./H4_root_cause_analysis.png)|
 
 
 ## 2. Conclusiones Transversales de Ingeniería
