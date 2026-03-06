@@ -4,6 +4,7 @@
 *.csv
 
 # Ignorar carpetas con datos locales
+.ipynb_checkpoints/
 /01_SQL_Fundamentals/database_storage/
 /01_SQL_Fundamentals/database_storage/01.02_CAPSTONE_UC_Davis_Agriculture_Project/database_storage/
 /02_SQL_Advanced_Wrangling_and_Testing/database_storage/
