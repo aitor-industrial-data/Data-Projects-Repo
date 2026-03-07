@@ -1,56 +1,47 @@
-def calculate_intensity(v, r):
-    try:
-        v=float(v)
-        r=float(r)
+raw_data = [
+    "S01:25.5:OK", "S02:40.0:WARNING", "S03:error:CRITICAL", 
+    "S04:15.2:OK", "S01:110.5:CRITICAL", "invalid_line", 
+    "S05:-999:ERROR", "S02:35.8:OK", None, "S06:22:OK"
+]
 
-        if r<=0 or v<=0:
-            return ('Error')
-        else:
-            i=round(v/r,2)
-            return (f'Power = {i} A')
-    except:
-        return 'Error'
+def parse_sensor_data(line):
+    """Limpia y valida una sola línea. Devuelve un dict o None."""
+    try:
+        parts = line.split(":")
+        if len(parts) != 3: return None
+        
+        sensor_id = parts[0]
+        temp = float(parts[1])
+        status = parts[2]
+        
+        # Validación de rango
+        if -50 < temp < 150:
+            return {"id": sensor_id, "temp": temp, "status": status}
+    except (ValueError, TypeError, AttributeError):
+        pass
+    return None
+
+def generate_report(data):
+    clean_records = []
+    discarded = 0
     
-
-def calculate_power(v, i):
-    try:
-        v=float(v)
-        i=float(i)
-
-        if i<=0 or v<=0:
-            return ('Error')
+    # Procesamos una sola vez la lista
+    for entry in data:
+        parsed = parse_sensor_data(entry)
+        if parsed:
+            clean_records.append(parsed)
+            # Alerta inmediata
+            if parsed["status"] == "CRITICAL":
+                print(f"[ALERTA] Sensor {parsed['id']} a {parsed['temp']} grados!")
         else:
-            p=round(v*i,2)
-            return (f'Power = {p} W')
-    except:
-        return 'Error'
+            discarded += 1
+            
+    # Cálculos finales sobre datos limpios
+    if clean_records:
+        avg_temp = sum(r["temp"] for r in clean_records) / len(clean_records)
+        print(f"\nTemperatura media: {avg_temp:.2f} grados")
     
-def calculate_resistance(v, i):
-    try:
-        v=float(v)
-        i=float(i)
+    print(f"Lecturas descartadas: {discarded}")
 
-        if i<=0 or v<=0:
-            return ('Error')
-        else:
-            r=round(v/i,2)
-            return (f'Power = {r} Ohm')
-    except:
-        return 'Error'
+generate_report(raw_data)
 
-prog = input('Elige programa: 1 - calculate_intensity, 2 - calculate_power, 3 - calculate_resistance  ')
-prog=float(prog)
-if prog==1:
-    v = input('Intorduce voltage (V): ')
-    r = input('Intorduce resistencia (Ohm): ')
-    print(calculate_intensity(v, r))
-elif prog==2:
-    v = input('Intorduce voltage (V): ')
-    i = input('Intorduce Intensidad (A): ')
-    print(calculate_power(v, i))
-elif prog==3:
-    v = input('Intorduce voltage (V): ')
-    i = input('Intorduce Intensidad (A): ')
-    print(calculate_resistance(v, i))
-else:
-    print('Programa no valido')
