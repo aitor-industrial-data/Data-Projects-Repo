@@ -2,6 +2,12 @@
 # 05_unit_converter_tool.py
 # AUTOR: Aitor | Ingeniero Técnico Industrial | Data Engineer
 # PROYECTO: Terminal de Diagnóstico y Conversión (Mes 4 - Funciones I)
+#
+# ENUNCIADO:
+# 1. Crear funciones reutilizables para validación, conversión y diagnóstico.
+# 2. Implementar un sistema de login de 3 intentos usando lógica anidada.
+# 3. Realizar conversiones de potencia (kW a HP) y evaluar rangos de presión.
+# 4. Foco Técnico: Encapsulamiento en funciones.
 ################################################################################
 
 # Credenciales de acceso (Administración de Planta)
@@ -16,12 +22,10 @@ def logging(user, password):
 
 def pot_calculator(kw):
     """Conversión de potencia de entrada a unidad imperial (HP)."""
-    try:
-        kw_val = float(kw)
-        hp = round(kw_val / 0.7457, 2)
-        return hp
-    except (ValueError, TypeError):
-        return None
+    # Eliminado try/except: convertimos directamente
+    kw_val = float(kw)
+    hp = round(kw_val / 0.7457, 2)
+    return hp
 
 def press_oil(bar):
     """
@@ -30,16 +34,14 @@ def press_oil(bar):
     - 1.5 a 5.0 bar: Rango Nominal de operación.
     - > 5.0 bar: Sobrepresión (Posible obstrucción o válvula defectuosa).
     """
-    try:
-        bar_val = float(bar)
-        if bar_val > 5.0:
-            return 'ALERTA: SOBREPRESIÓN DETECTADA'
-        elif bar_val >= 1.5:
-            return 'OPERACIÓN NOMINAL (ESTABLE)'
-        else:
-            return 'CRÍTICO: PRESIÓN INSUFICIENTE (STOP)'
-    except (ValueError, TypeError):
-        return "ERROR: LECTURA NO VÁLIDA"
+    # Eliminado try/except: convertimos directamente
+    bar_val = float(bar)
+    if bar_val > 5.0:
+        return 'ALERTA: SOBREPRESIÓN DETECTADA'
+    elif bar_val >= 1.5:
+        return 'OPERACIÓN NOMINAL (ESTABLE)'
+    else:
+        return 'CRÍTICO: PRESIÓN INSUFICIENTE (STOP)'
 
 # --- 2. PROTOCOLO DE ACCESO (Security Layer) ---
 
@@ -67,6 +69,9 @@ print(f'\n--- SESIÓN INICIADA: {true_user.upper()} ---')
 
 # Cálculo de Potencia
 raw_kw = input('Entrada Potencia Motor (kW): ').strip()
+
+# IMPORTANTE: Al quitar el try/except, si no introducen un número, 
+# el programa fallará en la línea del float() dentro de la función.
 hp_result = pot_calculator(raw_kw)
 
 if hp_result is not None:
