@@ -5,8 +5,8 @@
 ################################################################################
 
 # Credenciales de acceso (Administración de Planta)
-true_user = 's'
-true_password = 's'
+true_user = 'aitor'
+true_password = 'data2026'
 
 # --- 1. DEFINICIÓN DE FUNCIONES TÉCNICAS ---
 
