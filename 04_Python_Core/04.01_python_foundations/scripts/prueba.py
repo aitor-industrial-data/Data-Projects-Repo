@@ -1,83 +1,26 @@
-################################################################################
-# 05_unit_converter_tool.py
-# AUTOR: Aitor | Ingeniero Técnico Industrial | Data Engineer
-# PROYECTO: Terminal de Diagnóstico y Conversión (Mes 4 - Funciones I)
-################################################################################
 
-# Credenciales de acceso (Administración de Planta)
-true_user = 's'
-true_password = 's'
 
-# --- 1. DEFINICIÓN DE FUNCIONES TÉCNICAS ---
+import os
+files=os.listdir('.')
+update_files=['2026_03_12_sensor_A.log','2026_03_12_sensor_b.log','2026_03_12_sensor_d.log','2026_03_12_sensor_B.log','2026_03_12_sensor_B.log']
+files=files+update_files
+files = [f.upper() for f in files]
+print(files)
+sensor_report={}
 
-def logging(user, password):
-    """Valida el acceso al sistema de control."""
-    return user == true_user and password == true_password
-
-def pot_calculator(kw):
-    """Conversión de potencia de entrada a unidad imperial (HP)."""
-    try:
-        kw_val = float(kw)
-        hp = round(kw_val / 0.7457, 2)
-        return hp
-    except (ValueError, TypeError):
-        return None
-
-def press_oil(bar):
-    """
-    Diagnóstico de presión de aceite (Rangos reales Motor Industrial):
-    - < 1.5 bar: Presión insuficiente (Peligro de gripado).
-    - 1.5 a 5.0 bar: Rango Nominal de operación.
-    - > 5.0 bar: Sobrepresión (Posible obstrucción o válvula defectuosa).
-    """
-    try:
-        bar_val = float(bar)
-        if bar_val > 5.0:
-            return 'ALERTA: SOBREPRESIÓN DETECTADA'
-        elif bar_val >= 1.5:
-            return 'OPERACIÓN NOMINAL (ESTABLE)'
-        else:
-            return 'CRÍTICO: PRESIÓN INSUFICIENTE (STOP)'
-    except (ValueError, TypeError):
-        return "ERROR: LECTURA NO VÁLIDA"
-
-# --- 2. PROTOCOLO DE ACCESO (Security Layer) ---
-
-print(">>> INICIALIZANDO SISTEMA DE CONTROL INDUSTRIAL v4.0 <<<")
-user = input('ID Usuario: ').lower().strip()
-password = input('Token Acceso: ')
-
-if not logging(user, password):
-    print('\n[AUTH ERROR] Credenciales no válidas. Intentos restantes: 2')
-    user = input('ID Usuario: ').lower().strip()
-    password = input('Token Acceso: ')
+for file in files:
     
-    if not logging(user, password):
-        print('\n[AUTH ERROR] Credenciales no válidas. Intentos restantes: 1')
-        user = input('ID Usuario: ').lower().strip()
-        password = input('Token Acceso: ')
-        
-        if not logging(user, password):
-            print('\n[SECURITY ALERT] Acceso denegado. Terminal bloqueada.')
-            quit()
-
-# --- 3. EJECUCIÓN DE DIAGNÓSTICO ---
-
-print(f'\n--- SESIÓN INICIADA: {true_user.upper()} ---')
-
-# Cálculo de Potencia
-raw_kw = input('Entrada Potencia Motor (kW): ').strip()
-hp_result = pot_calculator(raw_kw)
-
-if hp_result is not None:
-    print(f'[CONVERSIÓN] Potencia calculada: {hp_result} HP')
-else:
-    print('[ERROR] El formato de kW introducido es incorrecto.')
-
-# Diagnóstico de Presión
-raw_bar = input('Entrada Presión Aceite (Bar): ').strip()
-status_msg = press_oil(raw_bar)
-
-print(f'[DIAGNÓSTICO] Estado del lubricante: {status_msg}')
-
-print("\n>>> PROCESO FINALIZADO SIN ERRORES CRÍTICOS <<<")
+        if '.LOG' in file:
+            try:
+                f=file.split('.')[0]
+                f=file.split('_',3)
+                print(f[3])
+                sensor_report[f[3]]=sensor_report.get(f[3],0)+1
+            except:
+                 print(f'{file} [IGNORADO]')
+                 
+        else:
+             print(f'{file} [extension no valida]')
+if sensor_report != {}:
+    print(sensor_report)
+    print('[MOVIENDO] 2026_03_12_sensor_A.log -> /mnt/c/data/procesados/sensor_A/')

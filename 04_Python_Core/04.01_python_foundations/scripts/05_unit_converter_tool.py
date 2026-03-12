@@ -1,7 +1,7 @@
 ################################################################################
 # 05_unit_converter_tool.py
 # AUTOR: Aitor | Ingeniero Técnico Industrial | Data Engineer
-# PROYECTO: Terminal de Diagnóstico y Conversión (Mes 4 - Funciones I)
+# PROYECTO: Terminal de Diagnóstico y Conversión (Python Core)
 #
 # ENUNCIADO:
 # 1. Crear funciones reutilizables para validación, conversión y diagnóstico.
