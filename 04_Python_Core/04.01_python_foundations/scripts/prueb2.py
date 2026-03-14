@@ -1,56 +1,45 @@
-warehouse_stock = [
-    "item:Interruptor_Magnetotermico;qty:50;price:15.50",
-    "item:Cable_Cobre_10mm;qty:100;price:2.20",
-    "item:Interruptor_Magnetotermico;qty:20;price:14.00",
-    "item:Contactor_Trifasico;qty:0;price:45.00",
-    "item:Cable_Cobre_10mm;qty:50;price:-1.00",
-    "item:Sensor_Proximidad;qty:10;price:25.00"
-]
+import os
 
-final_inventory = {}
+# Get the current working directory
+current_folder = os.getcwd() 
 
-for line in warehouse_stock:
-    # 1. Parsing: Convertimos el string en un diccionario temporal
-    # Dividimos por ';' y luego cada parte por ':'
-    data = {}
-    for part in line.split(';'):
-        key, value = part.split(':')
-        data[key] = value
+# List all files and folders
+content = os.listdir(current_folder)
 
-    # 2. Conversión de tipos y limpieza
-    item_name = data['item']
-    qty = int(data['qty'])
-    price = float(data['price'])
 
-    # 3. Filtro de Calidad (Regla de negocio)
-    if qty <= 0 or price < 0:
-        continue  # Saltamos los datos erróneos
-
-    # 4. Consolidación (Agregación)
-    if item_name not in final_inventory:
-        # Inicializamos el registro si es la primera vez que vemos el item
-        final_inventory[item_name] = {
-            "total_qty": 0, 
-            "total_price_sum": 0.0, 
-            "count": 0
-        }
+file_mapping = {}
+for archivo in content:
+    # Separación segura: 'name' se queda con el nombre y 'ext' con la extensión (ej: .txt)
+    name, ext = os.path.splitext(archivo)
     
-    # Acumulamos los valores
-    final_inventory[item_name]["total_qty"] += qty
-    final_inventory[item_name]["total_price_sum"] += price
-    final_inventory[item_name]["count"] += 1
-
-# 5. Formateo final: Calculamos el promedio y limpiamos claves temporales
-result = {}
-for name, stats in final_inventory.items():
-    avg = stats["total_price_sum"] / stats["count"]
-    result[name] = {
-        "total_qty": stats["total_qty"],
-        "avg_price": round(avg, 2)
-    }
-
-print(result)
+    # Filtro importante: ignorar carpetas (que no tienen extensión) y el propio script
+    if ext == "" or archivo == "exercise_day102.py":
+        continue
         
-   
+    # Tu lógica de diccionario (que está muy bien planteada)
+    if ext not in file_mapping:
+        file_mapping[ext] = [archivo]
+    else:
+        file_mapping[ext].append(archivo)
 
+import shutil  # Necesaria para mover archivos
 
+for ext, files in file_mapping.items():
+    # Creamos un nombre de carpeta limpio (ej: de '.txt' a 'txt_files')
+    folder_name = ext.strip('.').lower() + "_files"
+    
+    # 1. Crear la carpeta si no existe
+    if not os.path.exists(folder_name):
+        os.makedirs(folder_name)
+        print(f"Created folder: {folder_name}")
+
+    # 2. Mover los archivos (Paso Final)
+    for file in files:
+        # Definimos origen y destino
+        source = os.path.join(current_folder, file)
+        destination = os.path.join(current_folder, folder_name, file)
+        
+        # Movemos el archivo
+        shutil.move(source, destination)
+        print(f"Moved: {file} -> {folder_name}/")
+        
