@@ -1,5 +1,5 @@
 ################################################################################
-# 12_log_report_generator.py
+# 14_log_report_generator.py
 # AUTOR: Aitor | Ingeniero Técnico Industrial | Data Engineer
 # PROYECTO: Generador de Reportes de Actividad (Python Core)
 #
@@ -36,7 +36,7 @@ def generate_log_report(filename: str, events: list):
         with open(filename, "w", encoding="utf-8") as file:
             # Cabecera profesional
             file.write("="*60 + "\n")
-            file.write("DAILY SERVER EVENT REPORT (12_log_report_generator.py)\n")
+            file.write("DAILY SERVER EVENT REPORT (14_log_report_generator.py)\n")
             file.write("="*60 + "\n\n")
             
             # Desempaquetado directamente en el bucle for (Más limpio)
