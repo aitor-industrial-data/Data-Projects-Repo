@@ -1,4 +1,4 @@
-# 04.01 Python Foundations for Industrial Engineering 🏗️
+# 04.01 Python Foundations for Industrial Engineering
 
 ## 📂 Descripción del Proyecto
 Este directorio contiene los pilares fundamentales de mi aprendizaje en Python. Como **Ingeniero Técnico Industrial** en transición hacia la **Ingeniería de Datos**, estos scripts están diseñados para cerrar la brecha entre la lógica industrial física y el procesamiento programático de datos.

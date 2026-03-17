@@ -1,4 +1,4 @@
-# 04.02 Data Structures & Logic for Data Engineering 📊
+# 04.02 Data Structures & Logic for Data Engineering
 
 ## 📂 Descripción del Proyecto
 Este directorio marca la transición de la sintaxis básica hacia la **gestión eficiente de colecciones de datos**. Como ingeniero, el enfoque en este módulo es la escalabilidad: pasar de manejar variables únicas a procesar conjuntos masivos de información (sensores, inventarios, configuraciones) mediante estructuras optimizadas.
