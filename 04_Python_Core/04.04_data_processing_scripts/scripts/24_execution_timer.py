@@ -1,3 +1,16 @@
+################################################################################
+# 24_execution_timer.py
+# AUTOR: Aitor | Ingeniero Técnico Industrial | Data Engineer
+# PROYECTO: Optimización y Telemetría de Consultas Multi-Tabla (Pytho Core)
+#
+# ENUNCIADO:
+# 1. Desarrollar un script de auditoría para medir el coste computacional de queries.
+# 2. Implementar una consulta SQL de alta complejidad con 4 JOINs y filtros HAVING.
+# 3. Analizar el rendimiento mediante la medición de latencia (Time) y memoria (Peak).
+# 4. Automatizar la generación de un reporte de Business Intelligence en formato .txt.
+# 5. Foco Técnico: Performance Profiling, SQL Relacional Complejo y File Persistence.
+################################################################################
+
 import sqlite3
 import time
 import tracemalloc

@@ -20,7 +20,7 @@ El objetivo es dominar el manejo avanzado de excepciones, la limpieza profunda d
 | # | Nombre del Archivo | Enunciado / Problema Real | Foco Técnico |
 | :--- | :--- | :--- | :--- |
 | 18 | [`18_robust_data_input.py`](./scripts/18_robust_data_input.py) | Validar entradas del usuario para que el script no se rompa si introducen texto por números. | `Try/Except` |
-| 19 | [`19_multi_exception_handler.py`](./scripts/19_multi_exception_handler.py) | **HITO**: Gestionar errores específicos (`ValueError`, `ZeroDivisionError`) en cálculos técnicos. | `HITO` |
+| 19 | [`19_multi_exception_handler.py`](./scripts/19_multi_exception_handler.py) | Gestionar errores específicos (`ValueError`, `ZeroDivisionError`) en cálculos técnicos. | `Try/Except adv.` |
 | 20 | [`20_text_data_cleaner.py`](./scripts/20_text_data_cleaner.py) | **HITO**: Limpiar un archivo de texto masivo eliminando caracteres especiales y normalizando nombres. | `HITO` |
 | 21 | [`21_string_cleaning_logic.py`](./scripts/21_string_cleaning_logic.py) | Eliminar espacios y caracteres extraños de una lista de nombres de tracks (Chinook). | `Preparación Datos` |
 | 22 | [`22_asset_management_oop.py`](./scripts/22_asset_management_oop.py) | Crear una clase `ElectricMotor` para gestionar datos de activos industriales (potencia, horas). | `OOP` |
@@ -33,7 +33,7 @@ El objetivo es dominar el manejo avanzado de excepciones, la limpieza profunda d
 ---
 
 ## 📈 Hitos de Aprendizaje
-1.  **Ingeniería a Prueba de Fallos:** Implementación del Hito para crear sistemas resilientes que gestionen múltiples tipos de errores sin interrumpir el flujo de datos.
+1.  **Ingeniería a Prueba de Fallos:** Crear sistemas resilientes que gestionen múltiples tipos de errores sin interrumpir el flujo de datos.
 2.  **Limpieza de Datos Masiva:** Aplicación del Hito para la normalización de grandes volúmenes de texto, un paso crítico antes de cualquier proceso de carga.
 3.  **Arquitectura Profesional (OOP):** Transición del código procedimental a clases y objetos, permitiendo una gestión escalable de activos industriales.
 4.  **Integración de Ecosistemas:** Conexión exitosa entre Python y SQL, dominando la carga de archivos externos (CSV/JSON) hacia bases de datos relacionales.
