@@ -1,3 +1,24 @@
+################################################################################
+# 27_final_core_audit.py
+# AUTOR: Aitor | Ingeniero Técnico Industrial | Data Engineer
+# PROYECTO: Sistema de Auditoría de Activos Industriales (Python Core)
+#
+# ENUNCIADO:
+# 1. Desarrollar un pipeline robusto para la auditoría técnica de motores eléctricos.
+# 2. Implementar Programación Orientada a Objetos (OOP) para modelar activos industriales, 
+#    gestionando potencias, tiempos de ejecución (runtime) y estados operativos.
+# 3. Integración de Datos (ETL): Extraer nombres de identificación desde la base de 
+#    datos SQL 'Chinook', aplicando limpieza de caracteres especiales y normalización 
+#    mediante métodos de string avanzados.
+# 4. Lógica de Ingeniería: Diagnosticar márgenes de seguridad basados en horas de uso, 
+#    automatizando la clasificación de estados en 'WARNING' (>5000h) y 'CRITICAL' (>10000h).
+# 5. Persistencia y Robustez: Implementar manejo de errores (Try-Except) para accesos 
+#    a DB y ficheros, generando un informe técnico profesional (.txt) con métricas 
+#    de rendimiento y resumen de alertas.
+# 6. Foco Técnico: OOP, Integración SQL (sqlite3), Logging Profesional, File I/O 
+#    y List Comprehensions para optimización de datos.
+################################################################################
+
 import sqlite3
 import time
 import logging
@@ -30,7 +51,7 @@ class ElectricMotor:
 
 def get_db_path():
     """Returns the absolute path for the Chinook database."""
-    # Ajuste dinámico para tu entorno WSL2 / Documents
+    # Ajuste dinámico para entorno WSL2 / Documents
     base_dir = os.path.expanduser("~/Documents/Data-Projects-Repo")
     db_path = os.path.join(base_dir, 'Chinook_Sqlite.sqlite')
     return db_path if os.path.exists(db_path) else 'Chinook_Sqlite.sqlite'

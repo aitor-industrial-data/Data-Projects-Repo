@@ -75,10 +75,10 @@ try:
 
     # --- REPORTE DE SALIDA ---
     print(f"\n[📊 STATUS REPORT]")
-    print(f" ├─ Archivo origen:  {file_name}")
-    print(f" ├─ Registros leídos: {len(clean_data)}")
-    print(f" ├─ Carga en DB:     {total_rows} filas insertadas")
-    print(f" └─ Transacción:     SUCCESS ✅")
+    print(f" ├─ {'Archivo origen:':<20} {file_name}")
+    print(f" ├─ {'Registros leídos:':<20} {len(clean_data)}")
+    print(f" ├─ {'Carga en DB:':<20} {total_rows} filas insertadas")
+    print(f" └─ {'Transacción:':<20} SUCCESS ✅")
     print("\n" + "="*60)
 
 except Exception as e:

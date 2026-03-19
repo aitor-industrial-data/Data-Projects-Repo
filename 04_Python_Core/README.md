@@ -35,12 +35,17 @@ El proyecto se divide en cuatro capas estratégicas que cubren desde la sintaxis
 
 ## 🚀 Implementaciones Técnicas Clave
 
-| Capacidad | Descripción Técnica |
-| :--- | :--- |
-| **Lógica Industrial** | Scripts para el cálculo de caída de tensión, conversión de unidades técnicas y validación de sensores. |
-| **Robustez de Código** | Gestión avanzada de excepciones para evitar rupturas en la ejecución de procesos de datos. |
-| **Optimización** | Uso de iteradores y estructuras inmutables para garantizar el rendimiento en el procesamiento de listas de sensores. |
-| **Integración SQL** | Puente directo entre lógica Python y bases de datos relacionales para validación de esquemas. |
+### 🏭 Lógica e Ingeniería Aplicada
+Se han desarrollado scripts especializados para la resolución de problemas técnicos reales, tales como el cálculo de **caída de tensión** según normativa técnica y la **normalización de datos de sensores**, asegurando que el código sea una herramienta útil en entornos industriales.
+
+### 🛡️ Robustez y Control de Errores
+Implementación sistemática de gestión de excepciones mediante bloques `try-except`. Esto garantiza que los flujos de datos no se interrumpan ante entradas malformadas, permitiendo la creación de herramientas de ingesta de datos a prueba de fallos.
+
+### ⚡ Optimización de Memoria y Rendimiento
+Uso estratégico de **iteradores**, estructuras de datos **inmutables** (tuplas) y comprensiones de listas. El enfoque está en minimizar el consumo de recursos al procesar grandes volúmenes de datos de inventario o lecturas de sensores.
+
+### 🔗 Integración SQL y Esquemas Relacionales
+Establecimiento de un puente directo entre Python y motores de base de datos. Se incluye la validación de esquemas, limpieza de nombres de columnas y la inserción masiva de registros, sentando las bases para futuros procesos ETL automatizados.
 
 ---
 
