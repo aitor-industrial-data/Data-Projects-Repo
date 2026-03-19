@@ -17,13 +17,22 @@ import platform
 from pathlib import Path
 
 # 1. CONFIGURACIÓN DE RUTAS AL ESCRITORIO (DESKTOP)
-# Detectamos el Escritorio según el sistema para que sea visible en Windows
-if platform.system() == "Linux":
-    # Ruta WSL2 hacia el Escritorio de Windows
-    base_path = Path("/mnt/c/Users/Aitor AL/Desktop/15_automated_folder_sorter")
-else:
-    # Ruta nativa de Windows al Escritorio
-    base_path = Path.home() / "Desktop" / "15_automated_folder_sorter"
+def get_desktop_path():
+    if platform.system() == "Linux" and "microsoft" in platform.uname().release.lower():
+        # Estamos en WSL2: Extraemos el usuario de Windows desde las variables de entorno de shell
+        # Usualmente /mnt/c/Users/NombreUsuario
+        win_user = os.popen("powershell.exe '$env:UserName'").read().strip()
+        return Path(f"/mnt/c/Users/{win_user}/Desktop/15_automated_folder_sorter")
+    else:
+        # Estamos en Windows nativo
+        return Path.home() / "Desktop" / "15_automated_folder_sorter"
+
+base_path = get_desktop_path()
+
+# Crear la carpeta si no existe para evitar errores de "File Not Found"
+base_path.mkdir(parents=True, exist_ok=True)
+
+print(f"\nTarget path: {base_path}")
 
 # Definimos el origen dentro de esa carpeta del escritorio
 source_path = base_path 
@@ -50,7 +59,7 @@ test_files = [
     "chinook_queries.sql", "deploy_service.sh"
 ]
 
-print(f"--- [STAGE 1] GENERANDO ARCHIVOS EN: {source_path} ---")
+print(f"\n--- [STAGE 1] GENERANDO ARCHIVOS EN: {source_path} ---")
 for file_name in test_files:
     full_file_path = source_path / file_name 
     full_file_path.touch()
