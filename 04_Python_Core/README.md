@@ -57,7 +57,7 @@ Establecimiento de un puente directo entre Python y motores de base de datos. Se
 | 15 | [`automated_folder_sorter.py`](./04.03_system_automation_lab/scripts/15_automated_folder_sorter.py) | Automatización OS | Clasificación automática de datasets por extensión (.csv, .json, .log). |
 | 20 | [`text_data_cleaner.py`](./04.04_data_processing_scripts/scripts/20_text_data_cleaner.py) | Limpieza de Datos | Normalización de strings y eliminación de caracteres especiales en archivos masivos. |
 | 22 | [`asset_management_oop.py`](./04.04_data_processing_scripts/scripts/22_asset_management_oop.py) | OOP Avanzado | Gestión de activos (motores eléctricos) mediante clases, potencia y horas de uso. |
-| 26 | [`csv_to_sqlite_bulk.py`](./04.04_data_processing_scripts/scripts/26_csv_to_sqlite_bulk.py.py) | Carga de Datos | Ingestión masiva de registros CSV hacia tablas estructuradas en SQLite. |
+| 26 | [`csv_to_sqlite_bulk.py`](./04.04_data_processing_scripts/scripts/26_csv_to_sqlite_bulk.py) | Carga de Datos | Ingestión masiva de registros CSV hacia tablas estructuradas en SQLite. |
 
 ---
 *Nota de Ingeniería: Este módulo constituye el motor lógico para el desarrollo posterior de herramientas de extracción web y orquestación de datos en la nube. El código sigue los estándares de legibilidad y documentación técnica necesarios para un perfil de Data Engineer profesional.*
