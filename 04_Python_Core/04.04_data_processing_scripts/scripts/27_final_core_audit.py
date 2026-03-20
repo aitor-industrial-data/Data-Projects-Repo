@@ -25,7 +25,7 @@ import logging
 import os
 from datetime import datetime
 
-# --- CONFIGURACIÓN DE LOGGING (Nivel Profesional) ---
+# --- CONFIGURACIÓN DE LOGGING ---
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
@@ -60,7 +60,7 @@ def run_final_audit():
     start_time = time.time()
     logging.info("Starting industrial audit system...")
 
-    # 1. INITIAL DATA (Hito 27: Consolidación)
+    # 1. INITIAL DATA (Hito 27)
     config_data = [
         {"id": "M-01", "mod": "VFD-Alpha", "kw": 45.0, "h": 850.0, "st": "active"},
         {"id": "M-02", "mod": "Direct-Beta", "kw": 75.0, "h": 6200.0, "st": "mantenimiento"},
