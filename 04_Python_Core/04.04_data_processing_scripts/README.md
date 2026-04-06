@@ -39,4 +39,4 @@ El objetivo es dominar el manejo avanzado de excepciones, la limpieza profunda d
 4.  **Integración de Ecosistemas:** Conexión exitosa entre Python y SQL, dominando la carga de archivos externos (CSV/JSON) hacia bases de datos relacionales.
 
 ---
-*Este bloque cierra tu formación en Python Core y valida tus habilidades para el Proyecto Final. ¡Estás listo para el Mes 5: Web Data y el Robot ETL!* 🚀
+*Este bloque cierra tu formación en Python Core y valida tus habilidades para el Proyecto Final.
