@@ -1,17 +1,83 @@
-# Ignorar el archivo
+################################################################################
+# .gitignore UNIVERSAL - DATA ENGINEER PROFILE
+################################################################################
+
+### 1. ENTORNOS VIRTUALES (AISLAMIENTO)
+# Ignora cualquier entorno virtual en cualquier subcarpeta
+venv/
+env/
+ENV/
+.venv/
+bin/
+lib/
+include/
+
+### 2. LENGUAJE PYTHON (ARCHIVOS TEMPORALES)
+# Archivos compilados y cachés que ensucian el repo
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+### 3. CIENCIA DE DATOS Y NOTEBOOKS
+# Checkpoints de Jupyter y archivos de configuración
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*
+.ipython/
+profile_default/
+ipython_config.py
+
+### 4. BASES DE DATOS Y ALMACENAMIENTO (DATA STORAGE)
+# Ignora archivos de datos pesados o bases de datos locales
 *.db
 *.sqlite
+*.sqlite3
 *.csv
-venv/
-__pycache__/
-*.pyc
-.vscode/
+*.parquet
+*.json
+*.avro
+*.xml
+# Evita subir carpetas de almacenamiento completas
+**/database_storage/
+**/data_storage/
+**/data/
 
-# Ignorar carpetas con datos locales
-.ipynb_checkpoints/
-/01_SQL_Fundamentals/database_storage/
-/01_SQL_Fundamentals/database_storage/01.02_CAPSTONE_UC_Davis_Agriculture_Project/database_storage/
-/02_SQL_Advanced_Wrangling_and_Testing/database_storage/
-/03_SQL_Big_Data_Spark/03.01_CAPSTONE_Industrial_Energy_Analytics/data_storage/
-/03_SQL_Big_Data_Spark/03.01_CAPSTONE_Industrial_Energy_Analytics/notebooks/.ipynb_checkpoints/
-/99_SQL_Practices_Chinook/database_storage/
+### 5. HERRAMIENTAS Y EDITORES (IDE)
+# Configuración específica de VS Code o PyCharm
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+### 6. LOGS Y ARCHIVOS DE SISTEMA
+# Archivos de registro que crecen con el tiempo
+*.log
+logs/
+*.bak
+*.tmp
+*.temp
+
+### 7. SEGURIDAD (FUNDAMENTAL)
+# Nunca subir claves o variables de entorno
+.env
+.secrets
+secrets.txt
+*.pem
+*.key
