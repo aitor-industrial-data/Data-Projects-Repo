@@ -1,7 +1,11 @@
-# Ignorar el archivo de base de datos de SQLite
+# Ignorar el archivo
 *.db
 *.sqlite
 *.csv
+venv/
+__pycache__/
+*.pyc
+.vscode/
 
 # Ignorar carpetas con datos locales
 .ipynb_checkpoints/
