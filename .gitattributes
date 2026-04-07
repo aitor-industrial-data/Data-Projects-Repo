@@ -1,3 +1,29 @@
-*.ipynb linguist-detectable=true
+################################################################################
+# .gitattributes PROFESIONAL - DATA ENGINEER PROFILE
+################################################################################
+
+### 1. CONTROL DE FINALES DE LÍNEA (CRLF vs LF)
+# Asegura que los scripts siempre usen LF (Linux), vital para WSL2 y Docker
+* text=auto eol=lf
+
+### 2. DETECCIÓN DE LENGUAJES (ESTADÍSTICAS DE GITHUB)
+# Fuerza a GitHub a contar estos archivos en las estadísticas del repo
 *.py linguist-detectable=true
 *.sql linguist-detectable=true
+*.ipynb linguist-detectable=true
+*.sh linguist-detectable=true
+
+### 3. MANEJO DE ARCHIVOS DE DATOS Y BINARIOS
+# Evita que Git intente "arreglar" el texto en archivos que no son código
+*.csv binary
+*.db binary
+*.sqlite binary
+*.parquet binary
+*.pdf binary
+*.png diff=image
+*.jpg diff=image
+
+### 4. CONFIGURACIONES ESPECÍFICAS
+# Marcar archivos de configuración para que no se mezclen por error
+.gitignore export-ignore
+.gitattributes export-ignore
