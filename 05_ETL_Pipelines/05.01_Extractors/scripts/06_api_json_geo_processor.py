@@ -49,17 +49,18 @@ try:
 
     # 4. Análisis (Transform)
     js = json.loads(datos)
-
+    
     # Validación de la estructura de datos recibida
     if not js or 'features' not in js or len(js['features']) == 0:
         print('==== Error: No se encontraron resultados o fallo en la descarga ====')
     else:
         # Navegamos por la estructura: features[0] -> properties -> plus_code
         # El Plus Code es una forma moderna de dirección basada en coordenadas
-        plus_code = js['features'][0]['properties']['plus_code']
+        # Si no encuentra 'plus_code', devuelve None en lugar de romper el programa
+        plus_code = js['features'][0]['properties'].get('plus_code', 'No disponible')
         
         # 5. Salida de resultados (Reporte)
-        print(f'Plus code {plus_code}')
+        print(f'Plus code: {plus_code}')
 
 except Exception as e:
     print(f"Error en la conexión o en el procesado: {e}")

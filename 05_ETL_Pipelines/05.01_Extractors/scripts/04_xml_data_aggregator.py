@@ -40,6 +40,7 @@ print(f'Retrieving {url}')
 try:
     uh = urllib.request.urlopen(url, context=ctx)
     data = uh.read()
+    info=json.load(data)
     print(f'Retrieved {len(data)} characters')
 
     # 3. Análisis y Transformación (Transform)
