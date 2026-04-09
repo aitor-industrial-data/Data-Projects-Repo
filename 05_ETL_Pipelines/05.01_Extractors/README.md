@@ -1,14 +1,19 @@
 # 🚀 05.01 Extractors: Ingesta de Datos Multifuente
 
-Este directorio contiene la fase **Extract** de mis pipelines de ingeniería de datos. Aquí se demuestra la transición desde los fundamentos de protocolos de red hasta la creación de extractores industriales automatizados.
+## 📂 Descripción del Proyecto
 
-## 📌 Resumen del Módulo
-En esta sección, he desarrollado una serie de scripts que cubren el espectro completo de la recuperación de información digital:
-* **Protocolos de Bajo Nivel:** Manejo directo de Sockets TCP/IP.
-* **Web Scraping & Crawling:** Navegación por el DOM y árboles XML/HTML.
-* **Consumo de APIs REST:** Procesamiento de estructuras JSON y GeoJSON.
-* **Extracción Dinámica:** Automatización con Selenium para SPAs (Single Page Applications).
+Este directorio constituye la fase de **Ingesta (Extract)** dentro del ciclo de vida de un Pipeline ETL. El enfoque en este bloque se centra en la recuperación de activos digitales desde fuentes externas, evolucionando desde la comunicación por sockets de bajo nivel hasta la interacción avanzada con APIs gubernamentales y contenido web dinámico.
 
+El objetivo es dominar las técnicas de extracción que permiten a un Ingeniero de Datos recolectar información de forma masiva y segura, gestionando protocolos de red, parseo de estructuras semi-estructuradas (XML/JSON) y la normalización crítica de tipos de datos para asegurar la integridad en las fases posteriores de carga.
+
+---
+
+## 🛠️ Stack Técnico
+
+* **Lenguaje:** Python 3.12+
+* **Entorno:** Visual Studio Code con WSL2 (Ubuntu)
+* **Librerías Clave:** `requests`, `BeautifulSoup4`, `selenium`, `urllib`, `xml.etree`.
+* **Conceptos Clave:** API REST, Web Scraping, Autenticación por Headers, XPath, DOM Parsing y Headless Browsing.
 ---
 
 ## 🏆 Proyecto Destacado (HITO)
@@ -25,7 +30,7 @@ En esta sección, he desarrollado una serie de scripts que cubren el espectro co
 
 ---
 
-## 📂 Inventario de Scripts
+## 📜 Inventario de Scripts
 
 A continuación, se detallan los scripts que forman la base técnica de este módulo:
 
@@ -38,23 +43,16 @@ A continuación, se detallan los scripts que forman la base técnica de este mó
 | **[05_json_data_extractor.py](./scripts/05_json_data_extractor.py)** | Requests & List Comp | Consumo optimizado de APIs JSON utilizando comprensiones de lista. |
 | **[06_api_json_geo_processor.py](./scripts/06_api_json_geo_processor.py)** | GeoJSON & URL Encoding | Procesamiento de coordenadas y Plus Codes mediante APIs de geolocalización. |
 | **[07_selenium_dynamic_extractor.py](./scripts/07_selenium_dynamic_extractor.py)** | Selenium & Headless | Extracción de contenido renderizado por JavaScript (contenido dinámico). |
+| **[08_milestone_esios_price_extractor.py](./scripts/08_milestone_esios_price_extractor.py)** | Requests & API Auth | Extractor de grado industrial diseñado para el sector energético. |
 
 ---
 
-## 🛠️ Stack Tecnológico Utilizado
-* **Lenguaje:** Python 3.12+ (WSL2 Ubuntu)
-* **Librerías Clave:** `requests`, `BeautifulSoup4`, `selenium`, `lxml`.
-* **Herramientas:** Chromium Driver (Headless mode), DB Browser.
+## 📈 Hitos de Aprendizaje
 
-## ⚡ Cómo ejecutar los extractores
-1.  Asegúrate de tener instalado el entorno de Python y las dependencias:
-    ```bash
-    pip install requests beautifulsoup4 selenium
-    ```
-2.  Ejecutar el script deseado:
-    ```bash
-    python3 scripts/08_milestone_esios_price_extractor.py
-    ```
+* **Ingesta Profesional (HITO 08):** Implementación de un extractor de grado industrial que gestiona autenticación, limpieza de decimales europeos y normalización de fechas a ISO-8601, preparándolo para el Robot ETL.
+* **Gestión de APIs y Seguridad:** Configuración de cabeceras de autorización y manejo de parámetros de consulta seguros (URL Encoding) para la interacción con servicios externos.
+* **Procesamiento Semi-estructurado:** Dominio del parseo de archivos XML y JSON, transformando respuestas complejas de servidores en estructuras de datos de Python listas para análisis.
+* **Extracción de Contenido Dinámico:** Uso de técnicas de automatización de navegadores para superar las barreras de sitios web que utilizan carga asíncrona de datos.
 
 ---
-**Ingeniero:** Aitor | Industrial Systems Engineer turned Data Engineer.  
+Este bloque es la base fundamental para alimentar cualquier almacén de datos. 
