@@ -3,6 +3,11 @@
 # AUTOR: Aitor | Ingeniero Técnico Industrial | Data Engineer
 # PROYECTO: Interacción con APIs REST y Procesamiento de Plus Codes (Python)
 #
+# NOTA PROFESIONAL: Este script utiliza 'urllib' con fines educativos para 
+# entender el manejo nativo de Python. En entornos de producción y proyectos 
+# reales de ingeniería de datos, EL SISTEMA RECOMENDADO ES LA LIBRERÍA 'requests' 
+# por su simplicidad, manejo automático de SSL y gestión de sesiones.
+#
 # ENUNCIADO:
 # 1. El script solicita una ubicación (address) al usuario.
 # 2. Realiza una petición GET a una API de Open Street Map (subset estático).
@@ -56,8 +61,7 @@ try:
     else:
         # Navegamos por la estructura: features[0] -> properties -> plus_code
         # El Plus Code es una forma moderna de dirección basada en coordenadas
-        # Si no encuentra 'plus_code', devuelve None en lugar de romper el programa
-        plus_code = js['features'][0]['properties'].get('plus_code', 'No disponible')
+        plus_code = js['features'][0]['properties']['plus_code']
         
         # 5. Salida de resultados (Reporte)
         print(f'Plus code: {plus_code}')
