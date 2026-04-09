@@ -17,6 +17,7 @@ If we were to apply **TF-IDF (Term Frequency – Inverse Document Frequency)** t
 * *"Quiet environment"*
 * *"Meeting spot"*
 * *"Professional atmosphere"*
+
 These terms define the "success theme" for CoffeeKing: the coffee shop as a functional co-working space rather than just a walk-through store.
 
 ### The Role of Check-ins:

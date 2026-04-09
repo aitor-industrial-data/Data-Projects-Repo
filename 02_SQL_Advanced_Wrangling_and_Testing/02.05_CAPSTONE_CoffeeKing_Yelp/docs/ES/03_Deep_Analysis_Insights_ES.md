@@ -16,6 +16,7 @@ Si aplicáramos **TF-IDF (Frecuencia de término – Frecuencia inversa de docum
 * *"Ambiente tranquilo"*
 * *"Lugar de reuniones"*
 * *"Atmósfera profesional"*
+
 Estos términos definen el "tema del éxito" para CoffeeKing: la cafetería como un espacio de co-working funcional más que una simple tienda de paso.
 
 ### El Rol de los Check-ins:
