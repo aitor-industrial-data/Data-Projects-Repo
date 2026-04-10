@@ -49,7 +49,7 @@ A continuación, se detallan los scripts que forman la base técnica de este mó
 
 ## 📈 Hitos de Aprendizaje
 
-* **Ingesta Profesional (HITO 08):** Implementación de un extractor de grado industrial que gestiona autenticación, limpieza de decimales europeos y normalización de fechas a ISO-8601, preparándolo para el Robot ETL.
+* **Ingesta Profesional (script 08):** Implementación de un extractor de grado industrial que gestiona autenticación, limpieza de decimales europeos y normalización de fechas a ISO-8601, preparándolo para el Robot ETL.
 * **Gestión de APIs y Seguridad:** Configuración de cabeceras de autorización y manejo de parámetros de consulta seguros (URL Encoding) para la interacción con servicios externos.
 * **Procesamiento Semi-estructurado:** Dominio del parseo de archivos XML y JSON, transformando respuestas complejas de servidores en estructuras de datos de Python listas para análisis.
 * **Extracción de Contenido Dinámico:** Uso de técnicas de automatización de navegadores para superar las barreras de sitios web que utilizan carga asíncrona de datos.

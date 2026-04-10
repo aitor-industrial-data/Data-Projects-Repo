@@ -3,7 +3,7 @@
 # AUTOR: Aitor | Ingeniero Técnico Industrial | Data Engineer
 # PROYECTO: Ingesta Automatizada de Precios Eléctricos (Mercado PVPC)
 #
-# ENUNCIADO EXTENSO:
+# ENUNCIADO:
 # Desarrollar un componente de extracción (Scraper/API Consumer) que actúe como
 # la primera fase de un Pipeline ETL profesional. El objetivo es recuperar los 
 # datos del Precio Voluntario para el Pequeño Consumidor (PVPC) publicados por 
