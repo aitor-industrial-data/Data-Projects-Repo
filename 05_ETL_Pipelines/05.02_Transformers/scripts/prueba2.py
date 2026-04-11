@@ -1,34 +1,23 @@
-import sqlite3
+from sqlalchemy import create_engine, text
 
-conn = sqlite3.connect('emaildb.sqlite')
-cur = conn.cursor()
 
-cur.execute('DROP TABLE IF EXISTS Counts')
 
-cur.execute('''
-CREATE TABLE Counts (email TEXT, count INTEGER)''')
-#CREATE TABLE Counts (org TEXT, count INTEGER)
-fname = input('Enter file name: ')
-if (len(fname) < 1): fname = 'mbox-short.txt'
-fh = open(fname)
-for line in fh:
-    if not line.startswith('From: '): continue
-    pieces = line.split()
-    email = pieces[1]
-    cur.execute('SELECT count FROM Counts WHERE email = ? ', (email,))
-    row = cur.fetchone()
-    if row is None:
-        cur.execute('''INSERT INTO Counts (email, count)
-                VALUES (?, 1)''', (email,))
-    else:
-        cur.execute('UPDATE Counts SET count = count + 1 WHERE email = ?',
-                    (email,))
-    conn.commit()
+# El nombre del archivo debe ser exacto (Chinook_Sqlite.sqlite)
+engine = create_engine('sqlite:///Chinook_Sqlite.sqlite') 
 
-# https://www.sqlite.org/lang_select.html
-sqlstr = 'SELECT email, count FROM Counts ORDER BY count DESC LIMIT 10'
-
-for row in cur.execute(sqlstr):
-    print(str(row[0]), row[1])
-
-cur.close()
+try:
+    # Usamos .begin() para que maneje la transacción automáticamente
+    with engine.connect() as connection:
+        # Optimizamos la query: El conteo se hace en la DB, no en Python
+        query = text("SELECT COUNT(TrackId),* AS total FROM Track")
+        
+        result = connection.execute(query)
+        
+        # Al ser un conteo, solo esperamos una fila
+        row = result.mappings()
+        print(row)
+        if row:
+            print(f"Número total de tracks: {row['total']}")
+            
+except Exception as e:
+    print(f"Error de conexión o consulta: {e}")
