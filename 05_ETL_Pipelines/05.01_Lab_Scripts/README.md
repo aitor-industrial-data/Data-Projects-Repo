@@ -5,6 +5,7 @@
 Este directorio constituye el núcleo práctico del **Modulo 5**, cubriendo el ciclo de vida completo de un Pipeline ETL (Extract, Transform, Load). El enfoque en este bloque ha evolucionado desde la recuperación técnica de activos digitales mediante protocolos de red hasta la construcción de sistemas robustos que orquestan el flujo de datos desde APIs externas hacia almacenes de datos relacionales (SQLite/SQL).
 
 El objetivo es dominar la arquitectura de datos: recolectar información de forma masiva y segura, gestionar protocolos de red, parsear estructuras semi-estructuradas (XML/JSON) y aplicar una normalización crítica de tipos de datos para asegurar la integridad en las fases de carga y persistencia.
+
 ---
 
 ## 🛠️ Stack Técnico
@@ -13,6 +14,7 @@ El objetivo es dominar la arquitectura de datos: recolectar información de form
 * **Entorno:** Visual Studio Code con WSL2 (Ubuntu)
 * **Librerías Clave:** `requests`, `SQLAlchemy`, `pandas`, `BeautifulSoup4`, `selenium`, `sqlite3`, `xml.etree`.
 * **Conceptos Clave:** API REST, Modelado Relacional (SQL), ORM (Object-Relational Mapping), CRUD Lifecycle, Bulk Loading y Arquitectura ETL.
+
 ---
 
 ## 🏆 Proyecto Destacado (HITO)
@@ -36,6 +38,7 @@ Este proyecto es la culminación del **Mes 5** e integra un flujo completo de in
 * **Targeted Execution:** Permite ejecutar el pipeline por fases (solo extraer, solo transformar, etc.) para facilitar el mantenimiento.
 * **Observabilidad:** Sistema de *logging* profesional que registra el estado, errores y latencias de cada ejecución.
 * **Idempotencia:** El diseño permite ejecuciones recurrentes sin generar duplicados ni inconsistencias en la base de datos `crypto_market.db`.
+
 ---
 
 ## 📜 Inventario de Scripts
@@ -58,7 +61,6 @@ A continuación, se detallan los scripts que forman la base técnica de este mó
 | **[12_sqlalchemy_crud_lifecycle.py](./scripts/12_sqlalchemy_crud_lifecycle.py)** | ORM Fundamentals | Gestión del ciclo de vida de datos (Create, Read, Update, Delete) mediante SQLAlchemy. |
 | **[13_sqlalchemy_bulk_load.py](./scripts/13_sqlalchemy_bulk_load.py)** | Batch Processing | Técnicas de carga masiva (Bulk) para optimizar la eficiencia en grandes volúmenes de datos. |
 | **[14_crypto_etl_pipeline.py](./scripts/14_crypto_etl_pipeline.py)** | **Full ETL Robot** | Sistema final de monitorización: extracción de API, transformación y persistencia SQL. |
-
 
 ---
 
