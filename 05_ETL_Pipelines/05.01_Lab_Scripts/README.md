@@ -3,6 +3,7 @@
 ## 📂 Descripción del Proyecto
 
 Este directorio constituye el núcleo práctico del **Modulo 5**, cubriendo el ciclo de vida completo de un Pipeline ETL (Extract, Transform, Load). El enfoque en este bloque ha evolucionado desde la recuperación técnica de activos digitales mediante protocolos de red hasta la construcción de sistemas robustos que orquestan el flujo de datos desde APIs externas hacia almacenes de datos relacionales (SQLite/SQL).
+
 El objetivo es dominar la arquitectura de datos: recolectar información de forma masiva y segura, gestionar protocolos de red, parsear estructuras semi-estructuradas (XML/JSON) y aplicar una normalización crítica de tipos de datos para asegurar la integridad en las fases de carga y persistencia.
 
 ---
