@@ -62,7 +62,7 @@ class CryptoPrice(Base):
     """Esquema de la tabla para el almacenamiento de precios actuales."""
     __tablename__ = 'cryptoprices'
     id = Column(Integer, primary_key=True, autoincrement=True)
-    coin_id = Column(String, index=True)
+    coin_id = Column(String, index=True, unique=True)
     symbol = Column(String)
     name = Column(String)
     current_price = Column(Float)
@@ -149,8 +149,8 @@ def transform_data(raw_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 # 4. FASE: LOAD
 # ==============================================================================
 def load_to_db(clean_data: List[Dict[str, Any]], db_uri: str) -> None:
-    """Persistencia en DB mediante sesiones de SQLAlchemy y Batch commits."""
-    logger.info("Iniciando carga en base de datos...")
+    """Persistencia en DB con lógica Upsert (Update or Insert) y Batch commits."""
+    logger.info("Iniciando carga con lógica Upsert en base de datos...")
     
     engine = create_engine(db_uri, echo=False)
     Base.metadata.create_all(engine)
@@ -159,15 +159,29 @@ def load_to_db(clean_data: List[Dict[str, Any]], db_uri: str) -> None:
 
     try:
         total_records = len(clean_data)
+        
+        # Usamos enumerate para mantener el control del batching
         for index, data_dict in enumerate(clean_data, 1):
-            new_record = CryptoPrice(**data_dict)
-            session.add(new_record)
             
-            # Ejecución de commits por bloques (Batching)
+            # --- LÓGICA UPSERT ---
+            # 1. Buscamos si el activo ya existe por su coin_id
+            existing_coin = session.query(CryptoPrice).filter_by(coin_id=data_dict['coin_id']).first()
+            
+            if existing_coin:
+                # 2. Si existe, actualizamos sus valores volátiles
+                existing_coin.current_price = data_dict['current_price']
+                existing_coin.last_updated = data_dict['last_updated']
+            else:
+                # 3. Si no existe, creamos el registro nuevo
+                new_record = CryptoPrice(**data_dict)
+                session.add(new_record)
+            
+            # --- GESTIÓN DE COMMITS (BATCHING) ---
+            # Seguimos agrupando los commits para no saturar el disco
             if index % BATCH_SIZE == 0 or index == total_records:
                 session.commit()
                 progress = (index / total_records) * 100
-                logger.info(f"Carga: {progress:.1f}% ({index}/{total_records})")
+                logger.info(f"Progreso carga: {progress:.1f}% ({index}/{total_records})")
 
     except SQLAlchemyError as e:
         session.rollback()
