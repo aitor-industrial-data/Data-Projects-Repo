@@ -177,7 +177,7 @@ def load_to_db(clean_data: List[Dict[str, Any]], db_uri: str) -> None:
                 session.add(new_record)
             
             # --- GESTIÓN DE COMMITS (BATCHING) ---
-            # Seguimos agrupando los commits para no saturar el disco
+            # Agrupando los commits para no saturar el disco
             if index % BATCH_SIZE == 0 or index == total_records:
                 session.commit()
                 progress = (index / total_records) * 100
