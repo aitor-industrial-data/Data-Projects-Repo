@@ -1,8 +1,14 @@
 
+import logging
+
+
+logger = logging.getLogger(__name__)
+
 def transform_weather_forecast(item: dict) -> dict:
     """
     TRANSFORM: Converts raw data to explicit types and handles errors.
     """
+    
     try:
         # 1. Extraemos y aseguramos Tipos de Datos (Casting)
         # La fecha la dejamos en str (formato ISO para SQLite)
@@ -46,5 +52,5 @@ def transform_weather_forecast(item: dict) -> dict:
 
     except (ValueError, TypeError, KeyError) as e:
         # Si un dato viene mal (ej: una letra donde debería haber un número)
-        print(f"⚠️ Error transforming record {item.get('dt')}: {e}")
+        logger.warning(f"⚠️ Error transforming record {item.get('dt')}: {e}")
         return None

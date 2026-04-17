@@ -1,32 +1,49 @@
 import requests
 import logging
 import os
+import sys
 from typing import Dict, Any
+from dotenv import load_dotenv 
 
-
-# Solo declaramos, NO configuramos basicConfig aquí
 logger = logging.getLogger(__name__)
 
-def get_weather_forecast(lat: float, lon: float) -> Dict[str, Any]:
+load_dotenv()
+
+API_KEY = os.getenv("WEATHER_API_KEY")
+
+try:
+    LAT = float(os.getenv("SITE_LATITUDE", 0.0))
+    LON = float(os.getenv("SITE_LONGITUDE", 0.0))
+
+except (ValueError, TypeError) as e:
+    logger.error(f"❌ ERROR CRÍTICO DE CONFIGURACIÓN: {e}")
+    logger.error("El Robot ETL no puede continuar con datos inválidos o ausentes en el .env.")
+    # Detenemos la ejecución por completo
+    sys.exit(1)
+
+
+
+def get_weather_forecast(lat: float = None, lon: float = None) -> Dict[str, Any]:
 
     """
     get_weather_forecast: Obtiene la serie temporal de 5 días (cada 3 horas) desde OpenWeather.
 
     """
-    
+    # Usamos las variables cargadas fuera si no se pasan por argumento
+    target_lat = lat if lat is not None else LAT
+    target_lon = lon if lon is not None else LON
 
-    api_key = os.getenv("WEATHER_API_KEY")
     url = "https://api.openweathermap.org/data/2.5/forecast"
     
     params = {
-        'lat': lat,
-        'lon': lon,
-        'appid': api_key,
+        'lat': target_lat,
+        'lon': target_lon,
+        'appid': API_KEY,
         'units': 'metric',
         'lang': 'en'
     }
 
-    logger.info(f"🛰️ Consultando OpenWeather ({lat}, {lon})")
+    logger.info(f"🛰️ Consultando OpenWeather ({target_lat}, {target_lon})")
 
     try:
         response = requests.get(url, params=params, timeout=15)
