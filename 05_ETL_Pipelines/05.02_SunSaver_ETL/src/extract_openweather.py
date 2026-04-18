@@ -2,7 +2,7 @@ import requests
 import logging
 import os
 import sys
-from typing import Dict, Any
+from typing import List, Dict, Any
 from dotenv import load_dotenv 
 
 logger = logging.getLogger(__name__)
@@ -10,20 +10,27 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 API_KEY = os.getenv("WEATHER_API_KEY")
-
-try:
-    LAT = float(os.getenv("SITE_LATITUDE", 0.0))
-    LON = float(os.getenv("SITE_LONGITUDE", 0.0))
-
-except (ValueError, TypeError) as e:
-    logger.error(f"❌ ERROR CRÍTICO DE CONFIGURACIÓN: {e}")
-    logger.error("El Robot ETL no puede continuar con datos inválidos o ausentes en el .env.")
-    # Detenemos la ejecución por completo
+if not API_KEY:
+    logger.error("Falta WEATHER_API_KEY en el .env")
     sys.exit(1)
 
 
+_lat_raw = os.getenv("SITE_LATITUDE")
+_lon_raw = os.getenv("SITE_LONGITUDE")
 
-def get_weather_forecast(lat: float = None, lon: float = None) -> Dict[str, Any]:
+if _lat_raw is None or _lon_raw is None:
+    logger.error("Faltan SITE_LATITUDE o SITE_LONGITUDE en el .env")
+    sys.exit(1)
+
+try:
+    LAT = float(_lat_raw)
+    LON = float(_lon_raw)
+except ValueError as e:
+    logger.error(f"Coordenadas con formato inválido: {e}")
+    sys.exit(1)
+
+
+def get_weather_forecast(lat: float = None, lon: float = None) -> List[Dict[str, Any]]:
 
     """
     get_weather_forecast: Obtiene la serie temporal de 5 días (cada 3 horas) desde OpenWeather.
@@ -43,7 +50,7 @@ def get_weather_forecast(lat: float = None, lon: float = None) -> Dict[str, Any]
         'lang': 'en'
     }
 
-    logger.info(f"🛰️ Consultando OpenWeather ({target_lat}, {target_lon})")
+    logger.info(f"🛰️  Consultando OpenWeather ({target_lat}, {target_lon})")
 
     try:
         response = requests.get(url, params=params, timeout=15)

@@ -3,7 +3,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def transform_pvgis_data(raw_data: dict) -> list:
+def transform_pvgis_data(raw_data: list[dict]) -> list[dict]:
     """
     Transforma el JSON bruto de PVGIS con manejo de errores por cada registro.
     """
@@ -23,6 +23,7 @@ def transform_pvgis_data(raw_data: dict) -> list:
 
             dt_obj = datetime.strptime(raw_time, "%Y%m%d:%H%M")
             clean_timestamp = dt_obj.strftime("%Y-%m-%d %H:00:00")
+            clean_unix_ts = int(dt_obj.timestamp())
 
             raw_power = row.get("P", 0)
             clean_power = round(float(raw_power / 1000), 3) # De W a kW
@@ -39,7 +40,8 @@ def transform_pvgis_data(raw_data: dict) -> list:
 
             # 3. Construcción del Item
             item = {
-                "timestamp": clean_timestamp,  
+                "timestamp": clean_timestamp,
+                "unix_timestamp":  clean_unix_ts,  
                 "power_kw": clean_power, 
                 "irradiance_wm2": clean_irradiance,
                 "temp_c": clean_temp,
@@ -53,6 +55,6 @@ def transform_pvgis_data(raw_data: dict) -> list:
             logger.error(f"❌ Error transformando fila {row.get('time', 'unknown')}: {e}")
             continue 
 
-    logger.info(f"✅ Transformación completada: {len(transformed_data)}/8760 registros procesados con éxito.")
+    logger.info(f"✅ Transformación completada: {len(transformed_data)} registros procesados con éxito.")
     return transformed_data
     

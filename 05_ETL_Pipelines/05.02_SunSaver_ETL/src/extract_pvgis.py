@@ -2,7 +2,7 @@ import requests
 import logging
 import os
 import sys
-from typing import Dict, Any
+from typing import List, Dict, Any
 from dotenv import load_dotenv 
 
 logger = logging.getLogger(__name__)
@@ -16,6 +16,8 @@ try:
     LOSS = float(os.getenv("PV_SYSTEM_LOSS_PCT"))
     MOUNTING_PLACE = os.getenv("PV_MOUNTING_PLACE")
     YEAR = int(os.getenv("PV_YEAR"))
+    ANGLE = int(os.getenv("PV_ANGLE"))
+    ASPECT = int(os.getenv("PV_ASPECT"))
 
 except (ValueError, TypeError) as e:
     logger.error(f"❌ ERROR CRÍTICO DE CONFIGURACIÓN: {e}")
@@ -26,7 +28,7 @@ except (ValueError, TypeError) as e:
 
 
 
-def get_pvgis_data(lat: float = None, lon: float = None, peakpower: float = None, loss: float = None, mountingplace: str = None, year: int = None) -> Dict[str, Any]:
+def get_pvgis_data(lat: float = None, lon: float = None, peakpower: float = None, loss: float = None, mountingplace: str = None, year: int = None, angle: int = None, aspect: int = None) -> Dict[str, Any]:
     """
     Obtiene la SERIE HORARIA de producción fotovoltaica desde PVGIS.
     """
@@ -36,6 +38,8 @@ def get_pvgis_data(lat: float = None, lon: float = None, peakpower: float = None
     target_loss = loss if loss is not None else LOSS
     target_mount = mountingplace if mountingplace is not None else MOUNTING_PLACE
     target_year = year if year is not None else YEAR
+    target_angle = angle if angle is not None else ANGLE
+    target_aspect = aspect if aspect is not None else ASPECT
 
     url = "https://re.jrc.ec.europa.eu/api/v5_2/seriescalc"
     params = {
@@ -43,13 +47,17 @@ def get_pvgis_data(lat: float = None, lon: float = None, peakpower: float = None
         'lon': target_lon,
         'peakpower': target_pw,
         'loss': target_loss,
-        'mountingplace': target_mount,
         'startyear': target_year,
         'endyear': target_year,
-        'outputformat': 'json'
+        'outputformat': 'json',
+        'pvcalculation': 1,
+        'angle': target_angle,
+        'aspect': target_aspect,
+        'mounting': target_mount,      # ← versión compatible con pvcalculation
+        'pvtechchoice': 'crystSi'
     }
 
-    logger.info(f"🛰️ Consultando PVGIS Horario para el año {target_year}...")
+    logger.info(f"🛰️ Consultando PVGIS para el año {target_year}...")
 
     try:
         response = requests.get(url, params=params, timeout=15)
