@@ -42,7 +42,7 @@ import logging
 import extract_openweather
 import transform_openweather
 import calculate_solar_forecast
-import db_manager
+import antiguo_db_manager
 
 # ------------------------------------------------------------------------------
 # CONFIGURACIÓN GLOBAL DEL LOGGING
@@ -90,17 +90,17 @@ def run_pipeline_for_client(client: dict):
         )
 
         # LOAD BRONCE: historial inmutable de todas las ingestas
-        db_manager.load_bronze(raw_weather, 'raw_weather', client_id=client_id)
+        antiguo_db_manager.load_bronze(raw_weather, 'raw_weather', client_id=client_id)
 
         # READ BRONCE: leemos desde DB para desacoplar extract de transform
-        bronze_weather = db_manager.read_bronze('raw_weather', client_id=client_id, latest_only=True)
+        bronze_weather = antiguo_db_manager.read_bronze('raw_weather', client_id=client_id, latest_only=True)
 
         # TRANSFORM: limpieza, casting y normalización
         silver_weather = transform_openweather.transform_weather(bronze_weather, client_id=client_id)
 
         # LOAD PLATA: INSERT OR REPLACE — sobreescribe predicciones anteriores
         if silver_weather:
-            db_manager.load_to_db(silver_weather, "silver_weather")
+            antiguo_db_manager.load_to_db(silver_weather, "silver_weather")
         else:
             logger.warning(f"  ⚠️  No se generaron datos de clima para '{client_name}'.")
 
@@ -127,7 +127,7 @@ def run_pipeline_for_client(client: dict):
 
             # LOAD PLATA: INSERT OR REPLACE — sobreescribe predicciones anteriores
             if solar_forecast:
-                db_manager.load_to_db(solar_forecast, "silver_solar_forecast")
+                antiguo_db_manager.load_to_db(solar_forecast, "silver_solar_forecast")
             else:
                 logger.warning(f"  ⚠️  No se generó predicción solar para '{client_name}'.")
 
@@ -156,10 +156,10 @@ def run_pipeline():
     logger.info("🚀 Iniciando Pipeline ETL SunSaver (multi-cliente)...")
 
     # Garantizamos que todas las tablas existen antes de operar
-    db_manager.create_tables()
+    antiguo_db_manager.create_tables()
 
     # Cargamos todos los clientes registrados
-    clients = db_manager.get_all_clients()
+    clients = antiguo_db_manager.get_all_clients()
 
     if not clients:
         logger.warning("⚠️  No hay clientes registrados en la DB.")

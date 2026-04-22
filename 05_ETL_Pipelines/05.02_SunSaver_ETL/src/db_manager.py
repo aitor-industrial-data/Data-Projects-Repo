@@ -1,472 +1,54 @@
-# ==============================================================================
-# db_manager.py
-# ------------------------------------------------------------------------------
-# RESPONSABILIDAD : Gestionar toda la comunicación con la base de datos SQLite.
-# CAPA ETL        : LOAD (y READ para el flujo bronce → transform)
-# ------------------------------------------------------------------------------
-# ARQUITECTURA MEDALLION:
-#   BRONCE → Datos crudos tal como llegan de la API, en formato JSON serializado.
-#            Una fila por registro (OpenWeather, ESIOS) o una fila con el JSON
-#            completo (PVGIS). Nunca se modifican — son el historial de ingestas.
-#            Incluyen client_id para saber a qué cliente pertenece cada ingesta.
-#
-#   PLATA  → Datos limpios, tipados y con estructura fija. Una columna por campo.
-#            PRIMARY KEY compuesta (unix_timestamp, client_id).
-#            INSERT OR REPLACE garantiza que silver_weather siempre contiene
-#            la predicción meteorológica más reciente para cada timestamp.
-#            El historial real de ingestas queda en la capa bronce.
-#
-#   ORO    → (Futura) Datos agregados, cruzados y listos para decisiones y
-#            visualizaciones. Se generarán a partir de la plata.
-#
-# ARQUITECTURA MULTI-CLIENTE:
-#   Todos los datos (bronce, plata, oro) incluyen client_id para identificar
-#   a qué instalación pertenece cada registro. La tabla 'clients' centraliza
-#   la configuración de cada instalación solar.
-#
-# PIPELINE ETL RECURRENTE (ejecución periódica):
-#   OpenWeather → raw_weather → silver_weather → silver_solar_forecast
-#
-# PIPELINE DE SETUP (ejecución única por cliente):
-#   PVGIS → calcula loss_pct real → se guarda en clients
-#
-# FUNCIONES DISPONIBLES:
-#   create_tables()       → Crea todas las tablas si no existen
-#   get_all_clients()     → Devuelve la lista de clientes registrados
-#   get_client()          → Devuelve un cliente por su id
-#   add_client()          → Registra un nuevo cliente en la DB
-#   update_client_loss()  → Actualiza el loss_pct de un cliente tras calibración
-#   load_bronze()         → Guarda datos crudos en la capa bronce
-#   read_bronze()         → Lee datos crudos de la capa bronce
-#   load_to_db()          → Inserta registros limpios en cualquier tabla
-# ------------------------------------------------------------------------------
-# DEPENDENCIAS DE ENTORNO (.env):
-#   DB_PATH → Ruta al archivo SQLite (ej: ../data/sunsaver.db)
-# ==============================================================================
-
 import os
 import sqlite3
 import logging
-import json
+import pandas as pd
 from pathlib import Path
 from dotenv import load_dotenv
 
+import db_manager
+
+
 logger = logging.getLogger(__name__)
 
-load_dotenv()
 
-# ------------------------------------------------------------------------------
-# RUTA A LA BASE DE DATOS (PORTABILIDAD TOTAL)
-# ------------------------------------------------------------------------------
-
-# __file__ es '.../src/db_manager.py'
-# .parent       es '.../src/'
-# .parent.parent es '.../' (raíz del proyecto)
-BASE_DIR    = Path(__file__).resolve().parent.parent
-_DEFAULT_DB = BASE_DIR / "data" / "sunsaver.db"
-
-_db_path_env = os.getenv("DB_PATH")
-
-# Convertimos a string absoluto para que SQLite no tenga ambigüedades
-if _db_path_env:
-    DB_PATH = str(Path(_db_path_env).absolute())
-else:
-    DB_PATH = str(_DEFAULT_DB.absolute())
-
-
-# ==============================================================================
-# INFRAESTRUCTURA — CREACIÓN DE TABLAS
-# ==============================================================================
-
-def create_tables():
+def get_db_path() -> Path:
     """
-    Crea todas las tablas de la base de datos si no existen.
-    También crea el directorio data/ si no existe (portabilidad en nuevos PCs).
-
-    Es seguro ejecutarla múltiples veces — no borra datos existentes.
+    Retorna la ruta absoluta a la base de datos y asegura que el directorio exista.
     """
-    # Aseguramos que el directorio de la DB existe antes de conectar
-    db_folder = Path(DB_PATH).parent
-    if not db_folder.exists():
-        logger.info(f"📁 Creando carpeta de base de datos: {db_folder}")
-        db_folder.mkdir(parents=True, exist_ok=True)
+    load_dotenv()
 
-    # Logueamos la ruta activa solo si se está usando el fallback
-    if not _db_path_env:
-        logger.warning(f"⚠️  DB_PATH no definido en .env — usando ruta calculada: {DB_PATH}")
-
-    try:
-        with sqlite3.connect(DB_PATH) as conn:
-            cursor = conn.cursor()
-
-            # ------------------------------------------------------------------
-            # TABLA DE CLIENTES
-            # Centraliza la configuración de cada instalación solar.
-            # El pipeline ETL recurrente lee esta tabla para saber qué procesar.
-            # ------------------------------------------------------------------
-
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS clients (
-                    id                      INTEGER PRIMARY KEY AUTOINCREMENT,
-                    name                    TEXT NOT NULL,
-                    latitude                REAL NOT NULL,
-                    longitude               REAL NOT NULL,
-                    peak_power_kw           REAL NOT NULL,   
-                    panel_area_m2           REAL NOT NULL,
-                    efficiency              REAL NOT NULL,
-                    panel_type              TEXT NOT NULL,
-                    loss_pct                REAL NOT NULL,
-                    angle                   INTEGER NOT NULL,
-                    aspect                  INTEGER NOT NULL,
-                    mounting                TEXT NOT NULL,
-                    battery_capacity_kwh    REAL NOT NULL,
-                    soc_min_pct             REAL NOT NULL,
-                    installation_cost_eur   REAL NOT NULL,
-                    timezone                TEXT NOT NULL
-                )
-            ''')
-
-            # ------------------------------------------------------------------
-            # CAPA BRONCE — datos crudos de APIs recurrentes
-            # Solo OpenWeather y ESIOS son recurrentes.
-            # PVGIS se usa solo en el setup de cada cliente, no en el pipeline.
-            # ------------------------------------------------------------------
-
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS raw_solar (
-                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-                    client_id   INTEGER NOT NULL,
-                    ingested_at TEXT DEFAULT (datetime('now')),
-                    raw_data    TEXT,
-                    FOREIGN KEY (client_id) REFERENCES clients(id)
-                )
-            ''')
-
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS raw_weather (
-                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-                    client_id   INTEGER NOT NULL,
-                    ingested_at TEXT DEFAULT (datetime('now')),
-                    raw_data    TEXT,
-                    FOREIGN KEY (client_id) REFERENCES clients(id)
-                )
-            ''')
-
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS raw_prices (
-                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-                    client_id   INTEGER NOT NULL,
-                    ingested_at TEXT DEFAULT (datetime('now')),
-                    raw_data    TEXT,
-                    FOREIGN KEY (client_id) REFERENCES clients(id)
-                )
-            ''')
-
-            # ------------------------------------------------------------------
-            # CAPA PLATA — datos meteorológicos limpios
-            # INSERT OR REPLACE con PRIMARY KEY (unix_timestamp, client_id)
-            # garantiza que siempre contiene la predicción más reciente.
-            # El historial completo de ingestas está en raw_weather (bronce).
-            # ------------------------------------------------------------------
-
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS silver_weather (
-                    unix_timestamp INTEGER NOT NULL,
-                    client_id      INTEGER NOT NULL,
-                    forecast_time  TEXT,
-                    temperature    REAL,
-                    cloud_coverage INTEGER,
-                    condition_desc TEXT,
-                    wind_speed     REAL,
-                    wind_gust      REAL,
-                    source         TEXT,
-                    PRIMARY KEY (unix_timestamp, client_id),
-                    FOREIGN KEY (client_id) REFERENCES clients(id)
-                )
-            ''')
-
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS silver_prices (
-                    unix_timestamp INTEGER NOT NULL,
-                    client_id      INTEGER NOT NULL,
-                    price          REAL,
-                    currency       TEXT,
-                    source         TEXT,
-                    PRIMARY KEY (unix_timestamp, client_id),
-                    FOREIGN KEY (client_id) REFERENCES clients(id)
-                )
-            ''')
-
-            # ------------------------------------------------------------------
-            # CAPA PLATA — predicción de generación solar
-            # Calculada matemáticamente a partir de silver_weather y los
-            # parámetros de la instalación del cliente (tabla clients).
-            # INSERT OR REPLACE garantiza que siempre tiene la predicción
-            # más actualizada para cada timestamp y cliente.
-            # ------------------------------------------------------------------
-
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS silver_solar_forecast (
-                    unix_timestamp   INTEGER NOT NULL,
-                    client_id        INTEGER NOT NULL,
-                    forecast_time    TEXT,
-                    irradiance_wm2   REAL,    -- Irradiancia estimada en plano inclinado (W/m²)
-                    temperature_c    REAL,    -- Temperatura ambiente usada en el cálculo (°C)
-                    cloud_factor     REAL,    -- Factor de reducción por nubosidad (0.0 - 1.0)
-                    performance_ratio REAL,   -- PR ajustado por temperatura
-                    predicted_power_kw REAL,  -- Potencia generada estimada (kW)
-                    PRIMARY KEY (unix_timestamp, client_id),
-                    FOREIGN KEY (client_id) REFERENCES clients(id)
-                )
-            ''')
-
-            # ------------------------------------------------------------------
-            # CAPA ORO — (placeholder para desarrollo futuro)
-            # Aquí irán las decisiones energéticas y datos para visualizaciones:
-            #   energy_decisions (unix_timestamp, client_id, action, reason, savings_eur)
-            # ------------------------------------------------------------------
-
-            logger.info("🗄️  Infraestructura de base de datos verificada correctamente.")
-
-    except sqlite3.Error as e:
-        logger.error(f"❌ Error al crear las tablas: {e}")
-
-
-# ==============================================================================
-# GESTIÓN DE CLIENTES
-# ==============================================================================
-
-def add_client(name: str, latitude: float, longitude: float,
-               peak_power_kw: float, panel_area_m2: float, efficiency: float,
-               loss_pct: float, angle: int, aspect: int,
-               panel_type: str, mounting: str, timezone: str) -> int:
-    """
-    Registra un nuevo cliente en la base de datos.
-
-    Parámetros:
-        name          : Nombre identificativo de la instalación.
-        latitude      : Latitud de la instalación.
-        longitude     : Longitud de la instalación.
-        peak_power_kw : Potencia pico del sistema en kW.
-        panel_area_m2 : Área total de los paneles en m².
-        efficiency    : Eficiencia de los paneles (ej: 0.20 para 20%).
-        loss_pct      : Pérdidas del sistema en % — calculadas con PVGIS en setup.
-        angle         : Inclinación de los paneles en grados.
-        aspect        : Orientación (0=sur, 90=oeste, -90=este).
-        panel_type    : Tipo de panel ('crystSi', 'CIS', 'CdTe') — afecta al coef. térmico.
-        mounting      : Tipo de montaje ('free' o 'building').
-        timezone      : Zona horaria (ej: 'Europe/Madrid').
-
-    Retorna:
-        int — id del cliente recién creado, o None si falla.
-    """
-    try:
-        with sqlite3.connect(DB_PATH) as conn:
-            cursor = conn.cursor()
-            cursor.execute('''
-                INSERT OR REPLACE INTO clients
-                (name, latitude, longitude, peak_power_kw, panel_area_m2,
-                 efficiency, loss_pct, angle, aspect, panel_type, mounting, timezone)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (name, latitude, longitude, peak_power_kw, panel_area_m2,
-                  efficiency, loss_pct, angle, aspect, panel_type, mounting, timezone))
-            client_id = cursor.lastrowid
-
-        logger.info(f"✅ Cliente registrado: '{name}' (id={client_id}, panel={panel_type}, loss={loss_pct}%).")
-        return client_id
-
-    except sqlite3.Error as e:
-        logger.error(f"❌ Error al registrar cliente '{name}': {e}")
-        return None
-
-
-
-def get_all_clients() -> list[dict]:
+    # __file__ es "<raíz del proyecto>/src/sunsaver.db" -> .parent.parent es '<raíz del proyecto>'
+    # Ajustamos para que BASE_DIR sea la raíz del proyecto
+    BASE_DIR = Path(__file__).resolve().parent.parent
     
+    _default_db = BASE_DIR / "data" / "sunsaver.db"
+    _db_path_env = os.getenv("DB_PATH")
+
+    final_path = Path(_db_path_env) if _db_path_env else _default_db
+
+    # Aseguramos que la carpeta /data exista
+    final_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    return final_path.resolve()
+
+
+
+def extract_from_db(table_name: str) -> pd.DataFrame:
     """
-    Devuelve la lista completa de clientes registrados en la DB.
-
-    Retorna:
-        list[dict] — lista de clientes con todos sus campos de configuración.
-                     Lista vacía si no hay clientes registrados.
-    """
-    try:
-        with sqlite3.connect(DB_PATH) as conn:
-            conn.row_factory = sqlite3.Row  # Permite acceder por nombre de columna
-            cursor = conn.cursor()
-            cursor.execute("SELECT * FROM clients")
-            rows = cursor.fetchall()
-
-        clients = [dict(row) for row in rows]
-        logger.info(f"✅ {len(clients)} cliente(s) cargado(s) desde la DB.")
-        return clients
-
-    except sqlite3.Error as e:
-        logger.error(f"❌ Error al obtener clientes: {e}")
-        return []
-
-
-def get_client(client_id: int) -> dict:
-    """
-    Devuelve la configuración de un cliente específico por su id.
-
-    Parámetros:
-        client_id : int — id del cliente a consultar.
-
-    Retorna:
-        dict — configuración del cliente, o None si no existe.
+    Lee los datos de la tabla y los devuelve como DataFrame.
     """
     try:
-        with sqlite3.connect(DB_PATH) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            cursor.execute("SELECT * FROM clients WHERE id = ?", (client_id,))
-            row = cursor.fetchone()
+        db_path = db_manager.get_db_path()
+        
+        # 1. Conexión a la DB (usando str por seguridad de tipos)
+        with sqlite3.connect(str(db_path)) as conn:
+            # 2. Leemos la tabla entera directamente a un DataFrame
+            query = f"SELECT * FROM {table_name}"
+            df = pd.read_sql_query(query, conn)
+            
+        logger.info(f"✅ Extracción exitosa: {len(df)} registros extraidos de DB")
+        return df
 
-        if not row:
-            logger.warning(f"⚠️  No se encontró el cliente con id={client_id}.")
-            return None
-
-        return dict(row)
-
-    except sqlite3.Error as e:
-        logger.error(f"❌ Error al obtener cliente id={client_id}: {e}")
-        return None
-
-
-# ==============================================================================
-# CAPA BRONCE — ESCRITURA Y LECTURA
-# ==============================================================================
-
-def load_bronze(data, table_name: str, client_id: int) -> None:
-    """
-    Guarda datos crudos de la API en la capa bronce.
-
-    Acepta tanto un dict único (PVGIS — JSON completo) como una lista de dicts
-    (OpenWeather, ESIOS — un registro por elemento).
-
-    Parámetros:
-        data       : dict o list[dict] — datos crudos a guardar.
-        table_name : str — nombre de la tabla bronce (ej: 'raw_weather').
-        client_id  : int — id del cliente al que pertenecen los datos.
-    """
-    if not data:
-        logger.warning(f"⚠️  No hay datos para guardar en {table_name}.")
-        return
-
-    try:
-        with sqlite3.connect(DB_PATH) as conn:
-            cursor = conn.cursor()
-
-            if isinstance(data, dict):
-                values = [(client_id, json.dumps(data))]
-            elif isinstance(data, list):
-                values = [(client_id, json.dumps(record)) for record in data]
-            else:
-                logger.error(f"Tipo de dato no soportado para bronce: {type(data)}")
-                return
-
-            cursor.executemany(
-                f"INSERT INTO {table_name} (client_id, raw_data) VALUES (?, ?)", values
-            )
-
-        logger.info(f"✅ Bronce: {len(values)} registros guardados en '{table_name}' (client_id={client_id}).")
-
-    except sqlite3.Error as e:
-        logger.error(f"❌ Error al guardar en bronce ({table_name}): {e}")
-
-
-def read_bronze(table_name: str, client_id: int, latest_only: bool = True):
-    """
-    Lee datos crudos de la capa bronce y los deserializa a objetos Python.
-
-    Filtra por client_id y detecta automáticamente el tipo de dato:
-      - 1 fila con dict  → devuelve dict       (PVGIS)
-      - N filas con dict → devuelve list[dict]  (OpenWeather, ESIOS)
-
-    Parámetros:
-        table_name  : str  — nombre de la tabla bronce.
-        client_id   : int  — id del cliente cuyos datos se quieren leer.
-        latest_only : bool — si True, devuelve solo la última ingesta del cliente.
-
-    Retorna:
-        dict, list[dict] o None si no hay datos.
-    """
-    try:
-        with sqlite3.connect(DB_PATH) as conn:
-            cursor = conn.cursor()
-
-            if latest_only:
-                cursor.execute(f"""
-                    SELECT raw_data FROM {table_name}
-                    WHERE client_id = ?
-                    AND ingested_at = (
-                        SELECT MAX(ingested_at) FROM {table_name}
-                        WHERE client_id = ?
-                    )
-                """, (client_id, client_id))
-            else:
-                cursor.execute(
-                    f"SELECT raw_data FROM {table_name} WHERE client_id = ?",
-                    (client_id,)
-                )
-
-            rows = cursor.fetchall()
-
-        if not rows:
-            logger.warning(f"⚠️  No hay datos en '{table_name}' para client_id={client_id}.")
-            return None
-
-        records = [json.loads(row[0]) for row in rows]
-
-        if len(records) == 1 and isinstance(records[0], dict):
-            logger.info(f"✅ Bronce: 1 registro leído de '{table_name}' (dict, client_id={client_id}).")
-            return records[0]
-
-        logger.info(f"✅ Bronce: {len(records)} registros leídos de '{table_name}' (list[dict], client_id={client_id}).")
-        return records
-
-    except sqlite3.Error as e:
-        logger.error(f"❌ Error al leer de bronce ({table_name}): {e}")
-        return None
-
-
-# ==============================================================================
-# CAPA PLATA Y ORO — ESCRITURA
-# ==============================================================================
-
-def load_to_db(data_list: list[dict], table_name: str) -> None:
-    """
-    Inserta una lista de registros limpios en la tabla especificada.
-
-    Válido para cualquier capa de destino (plata, oro).
-    Usa INSERT OR REPLACE — si ya existe un registro con el mismo
-    PRIMARY KEY (unix_timestamp, client_id), lo sobreescribe con los
-    datos más recientes. Esto garantiza que silver_weather y
-    silver_solar_forecast siempre tienen la predicción más actualizada.
-
-    Parámetros:
-        data_list  : list[dict] — registros limpios a insertar (deben incluir client_id).
-        table_name : str — nombre de la tabla destino.
-    """
-    if not data_list:
-        logger.warning(f"⚠️  No hay datos para guardar en '{table_name}'.")
-        return
-
-    try:
-        with sqlite3.connect(DB_PATH) as conn:
-            cursor = conn.cursor()
-
-            keys         = data_list[0].keys()
-            columns      = ', '.join(keys)
-            placeholders = ', '.join(['?' for _ in keys])
-
-            sql    = f"INSERT OR REPLACE INTO {table_name} ({columns}) VALUES ({placeholders})"
-            values = [tuple(d.values()) for d in data_list]
-
-            cursor.executemany(sql, values)
-
-        logger.info(f"✅ {len(data_list)} registros guardados en '{table_name}'.")
-
-    except sqlite3.Error as e:
-        logger.error(f"❌ Error al guardar en '{table_name}': {e}")
+    except Exception as e:
+        logger.error(f"❌ Error extrayendo de DB: {e}")
+        return pd.DataFrame() # Devolvemos un DF vacío si falla

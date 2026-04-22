@@ -1,31 +1,8 @@
-import os
-import logging
 import sqlite3
-import db_manager
-import os
-import sqlite3
-import logging
-import json
-from pathlib import Path
-from dotenv import load_dotenv
+import hashlib
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
-)
-
-logger = logging.getLogger(__name__)
-
-
-def setup():
-    """Crea las tablas y registra los clientes iniciales."""
-
-    db_manager.create_tables()
-
-
-
-    clients = [
+# Lista de clientes (Tu fuente de verdad)
+clients = [
         {
             "name":          "Nave Industrial Pamplona",
             "latitude":      42.8124,
@@ -38,9 +15,6 @@ def setup():
             "angle":         30,         # Inclinación óptima para Navarra
             "aspect":        0,          # Orientación sur
             "mounting":      "free",     # Ventilado (estructura elevada)
-            "battery_capacity_kwh": 0.0,
-            "soc_min_pct": 20.0,
-            "installation_cost_eur": 0.0,
             "timezone":      "Europe/Madrid"
         },
         {
@@ -55,9 +29,6 @@ def setup():
             "angle":         28,
             "aspect":        0,
             "mounting":      "free",
-            "battery_capacity_kwh": 0.0,
-            "soc_min_pct": 20.0,
-            "installation_cost_eur": 0.0,
             "timezone":      "Europe/Madrid"
         },
         {
@@ -72,9 +43,6 @@ def setup():
             "angle":         15,
             "aspect":        10,         # Ligeramente desviado del sur
             "mounting":      "building",
-            "battery_capacity_kwh": 0.0,
-            "soc_min_pct": 20.0,
-            "installation_cost_eur": 0.0,
             "timezone":      "Europe/Madrid"
         },
         {
@@ -89,38 +57,59 @@ def setup():
             "angle":         30,         # Inclinación óptima para Navarra
             "aspect":        0,          # Orientación sur
             "mounting":      "free",     # Ventilado (estructura elevada)
-            "battery_capacity_kwh": 0.0,
-            "soc_min_pct": 20.0,
-            "installation_cost_eur": 0.0,
             "timezone":      "Europe/Madrid"
         },
     ]
 
-    # 1. Preparar la consulta SQL con placeholders
-    # Usamos nombres de columnas explícitos para evitar errores
-    query = '''
-        INSERT INTO clients (
-            name, latitude, longitude, peak_power_kw, panel_area_m2, 
-            efficiency, panel_type, loss_pct, angle, aspect, 
-            mounting, battery_capacity_kwh, soc_min_pct, 
-            installation_cost_eur, timezone
-        ) VALUES (
-            :name, :latitude, :longitude, :peak_power_kw, :panel_area_m2, 
-            :efficiency, :panel_type, :loss_pct, :angle, :aspect, 
-            :mounting, :battery_capacity_kwh, :soc_min_pct, 
-            :installation_cost_eur, :timezone
+def generate_client_id(name):
+    """Genera un ID consistente basado en el nombre."""
+    return hashlib.md5(name.encode('utf-8')).hexdigest()[:12]
+
+def ingest_clients_to_bronze(client_list):
+    # Conexión a la base de datos
+    db_path = "data_projects_repo.db"
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    # Crear tabla si no existe
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS clients_bronze (
+            client_id TEXT PRIMARY KEY,
+            name TEXT UNIQUE,
+            latitude REAL,
+            longitude REAL,
+            peak_power_kw REAL,
+            panel_area_m2 REAL,
+            efficiency REAL,
+            panel_type TEXT,
+            loss_pct REAL,
+            angle REAL,
+            aspect REAL,
+            mounting TEXT,
+            battery_capacity_kwh REAL,
+            soc_min_pct REAL,
+            installation_cost_eur REAL,
+            timezone TEXT
         )
-    '''
+    ''')
 
-    # 3. Insertar todos los datos de golpe
-    try:
-        cursor.executemany(query, clients)
-        connection.commit()
-        print(f"Éxito: {len(clients)} clientes insertados correctamente.")
-    except Exception as e:
-        connection.rollback()
-        print(f"Error al insertar: {e}")
+    for client in client_list:
+        client['client_id'] = generate_client_id(client['name'])
+        
+        # SQL para inserción o actualización (Upsert)
+        sql = '''
+            INSERT OR REPLACE INTO clients_bronze VALUES (
+                :client_id, :name, :latitude, :longitude, :peak_power_kw, 
+                :panel_area_m2, :efficiency, :panel_type, :loss_pct, :angle, 
+                :aspect, :mounting, :battery_capacity_kwh, :soc_min_pct, 
+                :installation_cost_eur, :timezone
+            )
+        '''
+        cursor.execute(sql, client)
 
+    conn.commit()
+    conn.close()
+    print(f"Proceso completado: {len(client_list)} clientes procesados en la capa Bronze.")
 
 if __name__ == "__main__":
-    setup()
+    ingest_clients_to_bronze(clients)
