@@ -15,10 +15,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
     
 
-
-import pandas as pd
-import numpy as np
-
 def transform_clients_bronze_to_silver(df_raw: pd.DataFrame) -> pd.DataFrame:
     """
     Transforma los datos de clientes de la capa Bronze a Silver aplicando
@@ -36,7 +32,6 @@ def transform_clients_bronze_to_silver(df_raw: pd.DataFrame) -> pd.DataFrame:
     text_cols = [
         'client_id', 'name', 'panel_type', 'mounting', 'timezone', '_ingested_at'
     ]
-    
 
     # 2. Forzar tipos de datos (Lo que no cuadre se convierte en NaN)
     for col in numeric_cols:
@@ -45,7 +40,6 @@ def transform_clients_bronze_to_silver(df_raw: pd.DataFrame) -> pd.DataFrame:
     for col in text_cols:
         df[col] = df[col].astype(str).replace(['None', 'nan', 'NaN', 'null'], np.nan)
     
-
     # 3. Tratamiento específico para la fecha de ingesta (para poder comparar)
     df['_ingested_at'] = pd.to_datetime(df['_ingested_at'], errors='coerce')
 
@@ -61,7 +55,7 @@ def transform_clients_bronze_to_silver(df_raw: pd.DataFrame) -> pd.DataFrame:
     # Nombre en mayúsculas
     df['name'] = df['name'].str.upper().str.strip()
 
-    # Validar coordenadas ( Lat 35-44, Lon -10 a 4)
+    # Validar coordenadas ( Lat -90 a 90, Lon -180 a 180)
     df = df[df['latitude'].between(-90, 90) & df['longitude'].between(-180, 180)]
 
     # Evitar valores negativos o absurdos
