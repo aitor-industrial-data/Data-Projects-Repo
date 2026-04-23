@@ -52,3 +52,5 @@ def extract_from_db(table_name: str) -> pd.DataFrame:
     except Exception as e:
         logger.error(f"❌ Error extrayendo de DB: {e}")
         return pd.DataFrame() # Devolvemos un DF vacío si falla
+    
+

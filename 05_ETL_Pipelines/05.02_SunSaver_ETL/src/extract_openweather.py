@@ -23,6 +23,9 @@ import sys
 from typing import List, Dict, Any
 from dotenv import load_dotenv
 
+import db_manager
+
+
 logger = logging.getLogger(__name__)
 
 load_dotenv()
@@ -120,3 +123,11 @@ Accesos rápidos:
     nubes       = registro['clouds']['all']
     fecha       = registro['dt_txt']
 """
+
+
+if __name__ == "__main__":
+    raw_clients=db_manager.extract_from_db('raw_clients')
+    print(raw_clients['latitude'])
+    '''lati=42.776
+    long=1.68
+    print(extract_weather(lati,long))'''

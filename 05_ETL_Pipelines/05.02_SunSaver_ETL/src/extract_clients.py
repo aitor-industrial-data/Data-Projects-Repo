@@ -50,7 +50,7 @@ def extract_clients_from_excel() -> list[dict]:
 
 
 
-def ingest_clients_to_bronze(client_list: list[dict], table_name: str) -> None:
+def ingest_clients_to_bronze(client_list: list[dict], table_name: str) -> bool:
     """
     Capa Bronce: Carga los datos crudos del Excel y añade 
     metadatos de auditoría (_ingested_at).
@@ -69,12 +69,14 @@ def ingest_clients_to_bronze(client_list: list[dict], table_name: str) -> None:
         with sqlite3.connect(str(db_path)) as conn:
             # Usamos 'replace' para asegurar que la estructura de la tabla 
             # coincida siempre con el Excel + nuestra columna de auditoría
-            df.to_sql(table_name, conn, if_exists='replace', index=False)
+            df.to_sql(table_name, conn, if_exists='append', index=False)
             
-        logger.info(f"✅ Ingesta exitosa: {len(df)} clientes presentes en base de datos")
-
+        logger.info(f"✅ Ingesta exitosa: {len(df)} registros añadidos a base de datos")
+        return True
+    
     except Exception as e:
         logger.error(f"❌ Error en la ingesta Bronce: {e}")
+        return False
 
 
 
