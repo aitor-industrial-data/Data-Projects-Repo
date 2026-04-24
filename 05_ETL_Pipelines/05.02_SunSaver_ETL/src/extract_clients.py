@@ -79,8 +79,13 @@ def ingest_clients_to_bronze(client_list: list[dict], table_name: str) -> bool:
         return False
 
 
+def extract_clients (table_name: str) -> bool:
+    #extrae e inyecta clientes en capa bronce de db
+    clients=extract_clients_from_excel()
+    ingest_clients_to_bronze(clients, table_name)
+
 
 if __name__ == "__main__":
     logger.info(f"Iniciando extraccion e ingesta de clientes en base de datos...")
-    clientes=extract_clients_from_excel()
-    ingest_clients_to_bronze(clientes,'raw_clients')
+    extract_clients('raw_clients')
+    

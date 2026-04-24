@@ -17,29 +17,27 @@
 # ==============================================================================
 
 import requests
+import sqlite3
 import logging
 import os
 import sys
-from typing import List, Dict, Any
+import pandas as pd
+import json
+from datetime import datetime
+from typing import Dict, Any
 from dotenv import load_dotenv
 
 import db_manager
 
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
 
 logger = logging.getLogger(__name__)
 
 load_dotenv()
-
-
-# ------------------------------------------------------------------------------
-# VALIDACIÓN DE CONFIGURACIÓN
-# Solo validamos la API KEY — las coordenadas vienen del cliente, no del .env.
-# ------------------------------------------------------------------------------
-
-API_KEY = os.getenv("WEATHER_API_KEY")
-if not API_KEY:
-    logger.error("Falta WEATHER_API_KEY en el .env")
-    sys.exit(1)
 
 
 # ------------------------------------------------------------------------------
@@ -48,24 +46,14 @@ if not API_KEY:
 # Se puede llamar con cualquier ubicación sin tocar el .env.
 # ------------------------------------------------------------------------------
 
-def extract_weather(lat: float, lon: float) -> List[Dict[str, Any]]:
-    """
-    Consulta la API de OpenWeather y devuelve la serie temporal de pronóstico.
-
-    Parámetros:
-        lat : Latitud de la ubicación del cliente.
-        lon : Longitud de la ubicación del cliente.
-
-    Retorna:
-        list[dict] — Lista de hasta 40 registros (5 días x 8 intervalos de 3h).
-        Cada dict contiene temperatura, nubes, viento, descripción y timestamp.
-
-    Lanza:
-        ValueError               — si la API devuelve una lista vacía.
-        requests.HTTPError       — si la API devuelve un código de error HTTP.
-        requests.ConnectionError — si no hay conexión con el servidor.
-    """
+def extract_weather(lat: float, lon: float)-> Dict[str, Any]:
+   
     url = "https://api.openweathermap.org/data/2.5/forecast"
+
+    API_KEY = os.getenv("WEATHER_API_KEY")
+    if not API_KEY:
+        logger.error("Falta WEATHER_API_KEY en el .env")
+        sys.exit(1)
 
     params = {
         'lat':   lat,
@@ -81,8 +69,7 @@ def extract_weather(lat: float, lon: float) -> List[Dict[str, Any]]:
         response = requests.get(url, params=params, timeout=15)
         response.raise_for_status()
 
-        # La API devuelve un JSON con la clave "list" que contiene los registros
-        all_data = response.json().get("list", [])
+        all_data = response.json()
 
         if not all_data:
             logger.error("OpenWeather devolvió una lista vacía — sin datos para procesar")
@@ -96,38 +83,79 @@ def extract_weather(lat: float, lon: float) -> List[Dict[str, Any]]:
         raise
 
 
-# ==============================================================================
-# REFERENCIA: ESTRUCTURA DEL DATO CRUDO (útil para desarrollar TRANSFORM)
-# ==============================================================================
-"""
-Cada elemento de la lista devuelta tiene este formato:
+def ingest_openweather_to_bronze(api_response: dict, table_name: str, client_id: str) -> bool:
+    """
+    Capa Bronce: Carga los datos crudos de la API y añade 
+    metadatos de auditoría (_ingested_at).
+    """
+    try:
+        db_path = db_manager.get_db_path()
 
-{
-    'dt': 1776351600,                        <- Unix timestamp del intervalo
-    'main': {
-        'temp': 23.75,                       <- Temperatura en °C
-        'humidity': 32,                      <- Humedad relativa en %
-        'pressure': 1018,                    <- Presión atmosférica en hPa
-        ...
-    },
-    'weather': [
-        {'description': 'clear sky', ...}   <- Descripción textual del tiempo
-    ],
-    'clouds': {'all': 0},                   <- Cobertura nubosa en %
-    'wind':   {'speed': 3.89, 'gust': 5.1}, <- Velocidad y ráfaga en m/s
-    'dt_txt': '2026-04-16 15:00:00'         <- Timestamp legible (UTC)
-}
+        # Convertimos el diccionario entero a un String de texto
+        raw_json_str = json.dumps(api_response, ensure_ascii=False)
+        ingested_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        # Creamos un DataFrame de una sola fila y dos columnas
+        df = pd.DataFrame([{
+            'client_id': client_id,
+            '_ingested_at': ingested_at,
+            'raw_data': raw_json_str
+        }])
+        
 
-Accesos rápidos:
-    temperatura = registro['main']['temp']
-    nubes       = registro['clouds']['all']
-    fecha       = registro['dt_txt']
-"""
+        with sqlite3.connect(str(db_path)) as conn:
+            df.to_sql(table_name, conn, if_exists='append', index=False)
+
+        logger.info(f"✅ Ingesta exitosa: {len(df)} registros añadidos a base de datos.")
+        return True
+    
+    except Exception as e:
+        logger.error(f"❌ Error en la ingesta Bronce: {e}")
+        return False
+
+
+def extract_all_clients_weather(client_table: str, weather_table: str) -> bool:
+    try:
+
+        db_path = db_manager.get_db_path()
+            
+        # 1. LEER CLIENTES: Traemos solo lo necesario de Silver
+        with sqlite3.connect(str(db_path)) as conn:
+            query = f"SELECT client_id, latitude, longitude FROM {client_table}"
+            df_clients = pd.read_sql(query, conn)
+
+
+        for index, row in df_clients.iterrows():
+            client_id = row['client_id']
+            lat = row['latitude']
+            lon = row['longitude']
+
+            try:
+                # Extracción
+                raw_weather=extract_weather(lat, lon)
+
+                # Ingesta
+                if raw_weather:
+                    ingest_openweather_to_bronze(raw_weather, weather_table, client_id)
+                else:
+                    logger.warning(f"⚠️ No se obtuvieron datos para el cliente {client_id}")
+
+            except Exception as e:
+                # Si falla un cliente, logueamos y seguimos con el siguiente
+                logger.error(f"❌ Error procesando cliente {client_id}: {e}")
+                continue
+
+        return True
+    
+    except Exception as e:
+        # Este try captura errores críticos (ej: no hay conexión a la DB inicial)
+        logger.critical(f"❌ Error crítico en extract_all_clients_weather: {e}")
+        return False
 
 
 if __name__ == "__main__":
-    raw_clients=db_manager.extract_from_db('raw_clients')
-    print(raw_clients['latitude'])
-    '''lati=42.776
-    long=1.68
-    print(extract_weather(lati,long))'''
+    
+    # Extre datos openweather de para cada client_id (clean_clients) de una tabla y lo inyecta en otra tabla (raw_weather)
+    extract_all_clients_weather('clean_clients', 'raw_weather')
+
+

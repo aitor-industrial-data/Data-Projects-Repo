@@ -1,99 +1,110 @@
-# ==============================================================================
-# transform_openweather.py
-# ------------------------------------------------------------------------------
-# RESPONSABILIDAD : Transformar los datos CRUDOS de OpenWeather a formato limpio.
-# CAPA ETL        : TRANSFORM
-# ENTRADA         : list[dict] — datos crudos leídos desde la capa bronce
-# SALIDA          : list[dict] — registros limpios y tipados para capa plata
-# ------------------------------------------------------------------------------
-# QUÉ HACE ESTE SCRIPT:
-#   - Extrae solo los campos relevantes de cada registro crudo
-#   - Garantiza los tipos de dato correctos (casting explícito)
-#   - Normaliza valores de texto (strip, lowercase)
-#   - Maneja valores ausentes con defaults seguros
-#   - Añade client_id a cada registro para soporte multi-cliente
-#   - Si un registro individual falla, lo salta y continúa con el resto
-# ==============================================================================
-
+import pandas as pd
+from datetime import datetime
+import sqlite3
+import json
 import logging
+from sqlalchemy import create_engine, text
+import numpy as np
+
+import db_manager
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
 
 logger = logging.getLogger(__name__)
 
-
-def transform_weather(raw_data: list[dict], client_id: int) -> list[dict]:
+def extract_from_db(table_name: str) -> pd.DataFrame:
     """
-    Transforma los registros crudos de OpenWeather a formato limpio para la DB.
-
-    Parámetros:
-        raw_data  : list[dict] — lista de registros crudos de la capa bronce.
-        client_id : int — id del cliente al que pertenecen los datos.
-
-    Retorna:
-        list[dict] — lista de registros limpios con las claves:
-            unix_timestamp : int   — timestamp Unix
-            client_id      : int   — id del cliente (para multi-cliente)
-            forecast_time  : str   — timestamp legible (UTC)
-            temperature    : float — temperatura en °C
-            cloud_coverage : int   — cobertura nubosa en %
-            condition_desc : str   — descripción normalizada del tiempo
-            wind_speed     : float — velocidad del viento en m/s
-            wind_gust      : float — ráfaga de viento en m/s
-            source         : str   — identificador de origen del dato
+    Lee los datos de la tabla y los devuelve como DataFrame.
     """
-    if not raw_data:
-        logger.warning("⚠️  No hay datos de clima para transformar.")
-        return []
+    try:
+        db_path = db_manager.get_db_path()
+        
+        # 1. Conexión a la DB (usando str por seguridad de tipos)
+        with sqlite3.connect(str(db_path)) as conn:
+            # 2. Leemos la tabla entera directamente a un DataFrame
+            query = f"SELECT * FROM {table_name}"
+            df = pd.read_sql_query(query, conn)
+            
+        logger.info(f"✅ Extracción exitosa: {len(df)} registros extraidos de DB")
+        return df
 
-    transformed_data = []
+    except Exception as e:
+        logger.error(f"❌ Error extrayendo de DB: {e}")
+        return pd.DataFrame() # Devolvemos un DF vacío si falla
+    
 
-    for item in raw_data:
-        try:
-            # ------------------------------------------------------------------
-            # 1. EXTRACCIÓN Y CASTING DE TIPOS
-            # Usamos .get() con valores por defecto para evitar KeyError.
-            # El casting explícito garantiza que los tipos son correctos
-            # independientemente de cómo lleguen los datos desde la API.
-            # ------------------------------------------------------------------
+def transform_weather_bronze_to_silver(df_raw: pd.DataFrame) -> pd.DataFrame:
+    """
+    Transforma los datos de weather de cada cliente de la capa Bronze a Silver aplicando
+    limpieza de nulos, tipado de datos y validación de campos críticos.
+    """
+    try:
+        if df_raw.empty:
+            return pd.DataFrame()
+        
+        df = df_raw.copy()
+        
+        data_to_clean = []
+    
+        for index, row in df.iterrows():
+            client_id = row['client_id']
+            ingested_at = row['_ingested_at']
 
-            clean_unix_ts       = int(item.get('dt', 0))
-            clean_forecast_time = str(item.get('dt_txt', ""))
-            clean_temp          = round(float(item.get('main', {}).get('temp', 0.0)), 2)
-            clean_clouds        = int(item.get('clouds', {}).get('all', 0))
-            clean_wind_speed    = round(float(item.get('wind', {}).get('speed', 0.0)), 2)
+            # Convertimos el string de nuevo a diccionario
+            raw_json = json.loads(row['raw_data'])
+            
+            # Extraemos la lista de los 40 pronósticos
+            forecasts = raw_json.get('list', [])
+            
+            for f in forecasts:
+                entry = {
+                    'client_id': client_id,
+                    'unix_time':f.get('dt'),
+                    'forecast_time': f.get('dt_txt'),
+                    'temp_celsius': f.get('main', {}).get('temp'),
+                    'clouds_pct': f.get('clouds', {}).get('all'),
+                    'rain_prob': f.get('pop'),
+                    'wind_speed': f.get('wind', {}).get('speed'),
+                    '_ingested_at': ingested_at
+                }
+                data_to_clean.append(entry)
+                
+        df = pd.DataFrame(data_to_clean)
 
-            # La ráfaga no siempre está presente — usamos la velocidad como fallback
-            clean_wind_gust = round(float(item.get('wind', {}).get('gust', clean_wind_speed)), 2)
+        # ==========================================
+        #          FASE DE LIMPIEZA
+        # ==========================================
 
-            # La descripción viene en una lista — cogemos el primer elemento
-            raw_desc   = item.get('weather', [{}])[0].get('description', 'unknown')
-            clean_desc = str(raw_desc).strip().lower()
+        # 1. TIPADO: Convertir a datetime para poder operar con fechas
+        df['forecast_time'] = pd.to_datetime(df['forecast_time'], errors='coerce')
+        df['_ingested_at'] = pd.to_datetime(df['_ingested_at'], errors='coerce')
+        
+        # 2. NULOS: Si no hay probabilidad de lluvia, es 0. 
+        # Si no hay temperatura, llenamos con la anterior (ffill) o 0
+        df['rain_prob'] = df['rain_prob'].fillna(0)
+        df = df.dropna(subset=['client_id', 'forecast_time']) # Campos críticos
 
-            # ------------------------------------------------------------------
-            # 2. CONSTRUCCIÓN DEL REGISTRO LIMPIO
-            # unix_timestamp y client_id van primero porque forman la
-            # PRIMARY KEY compuesta en la tabla silver_weather.
-            # El campo 'source' permite rastrear el origen en consultas cruzadas.
-            # ------------------------------------------------------------------
+        # 3. DEDUPLICACIÓN (Vital en tu caso):
+        # Como has lanzado el robot varias veces, tienes el mismo pronóstico repetido.
+        # Ordenamos por fecha de ingesta y nos quedamos con la última versión de cada pronóstico.
+        df = df.sort_values(by=['client_id', 'forecast_time', '_ingested_at'], ascending=[True, True, False])
+        df = df.drop_duplicates(subset=['client_id', 'forecast_time'], keep='first')
 
-            row = {
-                "unix_timestamp": clean_unix_ts,
-                "client_id":      client_id,
-                "forecast_time":  clean_forecast_time,
-                "temperature":    clean_temp,
-                "cloud_coverage": clean_clouds,
-                "condition_desc": clean_desc,
-                "wind_speed":     clean_wind_speed,
-                "wind_gust":      clean_wind_gust,
-                "source":         "OpenWeather_API"
-            }
 
-            transformed_data.append(row)
+        
+        logger.info(f"✅ Limpieza Silver completada: {len(df)} registros listos.")
+        return df
+        
+    except:
+        return pd.DataFrame()
 
-        except (ValueError, TypeError, KeyError) as e:
-            # Registro corrupto o con formato inesperado — lo saltamos y seguimos.
-            # Logueamos el timestamp del registro problemático para facilitar auditoría.
-            logger.warning(f"⚠️  Registro omitido (dt={item.get('dt', 'unknown')}): {e}")
-            continue
+if __name__ == "__main__":
 
-    logger.info(f"✅ Transformación de clima finalizada: {len(transformed_data)} registros (client_id={client_id}).")
-    return transformed_data
+    logger.info(f"Iniciando extraccion e ingesta de weaather de capa bronze a silver...")
+    raw_weather=extract_from_db('raw_weather')
+    print(transform_weather_bronze_to_silver(raw_weather))
+   

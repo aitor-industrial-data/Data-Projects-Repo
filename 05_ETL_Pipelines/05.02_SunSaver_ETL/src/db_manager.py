@@ -32,25 +32,5 @@ def get_db_path() -> Path:
     return final_path.resolve()
 
 
-
-def extract_from_db(table_name: str) -> pd.DataFrame:
-    """
-    Lee los datos de la tabla y los devuelve como DataFrame.
-    """
-    try:
-        db_path = db_manager.get_db_path()
-        
-        # 1. Conexión a la DB (usando str por seguridad de tipos)
-        with sqlite3.connect(str(db_path)) as conn:
-            # 2. Leemos la tabla entera directamente a un DataFrame
-            query = f"SELECT * FROM {table_name}"
-            df = pd.read_sql_query(query, conn)
-            
-        logger.info(f"✅ Extracción exitosa: {len(df)} registros extraidos de DB")
-        return df
-
-    except Exception as e:
-        logger.error(f"❌ Error extrayendo de DB: {e}")
-        return pd.DataFrame() # Devolvemos un DF vacío si falla
     
 

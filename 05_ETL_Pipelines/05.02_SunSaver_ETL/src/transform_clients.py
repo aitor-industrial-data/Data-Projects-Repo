@@ -1,4 +1,5 @@
 import pandas as pd
+import sqlite3
 import logging
 from sqlalchemy import create_engine, text
 import numpy as np
@@ -13,6 +14,27 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
+    
+
+def extract_from_db(table_name: str) -> pd.DataFrame:
+    """
+    Lee los datos de la tabla y los devuelve como DataFrame.
+    """
+    try:
+        db_path = db_manager.get_db_path()
+        
+        # 1. Conexión a la DB (usando str por seguridad de tipos)
+        with sqlite3.connect(str(db_path)) as conn:
+            # 2. Leemos la tabla entera directamente a un DataFrame
+            query = f"SELECT * FROM {table_name}"
+            df = pd.read_sql_query(query, conn)
+            
+        logger.info(f"✅ Extracción exitosa: {len(df)} registros extraidos de DB")
+        return df
+
+    except Exception as e:
+        logger.error(f"❌ Error extrayendo de DB: {e}")
+        return pd.DataFrame() # Devolvemos un DF vacío si falla
     
 
 def transform_clients_bronze_to_silver(df_raw: pd.DataFrame) -> pd.DataFrame:
@@ -113,7 +135,7 @@ def transform_clients_bronze_to_silver(df_raw: pd.DataFrame) -> pd.DataFrame:
     
     except Exception as e:
         
-        print(f"❌ ERROR CRÍTICO en la transformación Silver: {e}")
+        logger.error(f"❌ ERROR CRÍTICO en la transformación Silver: {e}")
        
         return pd.DataFrame()
 
@@ -127,7 +149,7 @@ def load_df_to_db(df: pd.DataFrame, table_name: str):
     
     try:
         if df.empty:
-            logger.warning(f"⚠️ El DataFrame para '{table_name}' está vacío. Cancelando inyección.")
+            logger.warning(f"⚠️  El DataFrame para '{table_name}' está vacío. Cancelando inyección.")
             return False
 
         engine = create_engine(f"sqlite:///{db_path}")
@@ -170,23 +192,19 @@ def load_df_to_db(df: pd.DataFrame, table_name: str):
     except Exception as e:
         logger.error(f"❌ Error al ingesta: {e}")
         return False
-    
 
-def transform_clients_resume (df_initial, df_final):
-    initial_total = len(df_initial)
-    final_total = len(df_final)
-    total_dropped = initial_total - final_total
-    logger.info(f"✅ Silver completado: {final_total} registros válidos | {total_dropped} descartados ({total_dropped / initial_total:.1%}) del total inicial.")
-    logger.info(f'\n{df_final}')
+
+def transform_clients(raw_clients_table: str, clean_clients_table:str) -> bool:
+    raw_clients=extract_from_db(raw_clients_table)
+    clean_clients=transform_clients_bronze_to_silver(raw_clients)
+    load_df_to_db(clean_clients, clean_clients_table)
 
 
 if __name__ == "__main__":
 
     logger.info(f"Iniciando extraccion e ingesta de clientes de capa bronze a silver...")
-    raw_clients=db_manager.extract_from_db('raw_clients')
-    clean_clients=transform_clients_bronze_to_silver(raw_clients)
-    load_df_to_db(clean_clients, 'clean_clients')
-    transform_clients_resume(raw_clients,clean_clients)
+    transform_clients('raw_clients', 'clean_clients')
+    
 
     
         
