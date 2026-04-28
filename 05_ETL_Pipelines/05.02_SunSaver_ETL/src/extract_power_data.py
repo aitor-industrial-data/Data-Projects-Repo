@@ -98,6 +98,7 @@ def transform_pv_generation(df_raw: pd.DataFrame) -> pd.DataFrame:
                 # 5. Calcular la potencia final (AC/DC) aplicando coeficientes de temperatura y pérdidas de eficiencia del sistema
                 p_gen, pr = pvgen.calculate_power_output(poa, t_cell, row['pv_peak_power_kw'], row['loss_pct'])
                 
+                # 6. Simula el consumo dinámico: aplica curvas de carga horarias y el incremento de potencia por refrigeración ante altas temperaturas.
                 p_con = pvgen.calculate_industrial_consumption(row['forecast_time'], row['nominal_load_kw'], row['temp_celsius'])
             
             entry = {

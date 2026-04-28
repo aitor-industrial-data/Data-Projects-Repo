@@ -1,10 +1,9 @@
 import pandas as pd
-from datetime import datetime
 import sqlite3
 import json
 import logging
 from sqlalchemy import create_engine, text
-import numpy as np
+
 
 import db_manager
 

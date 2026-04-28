@@ -254,6 +254,8 @@ def calculate_industrial_consumption(forecast_time, nominal_load_kw, temp_ambien
     Simula el consumo de una fábrica escalado proporcionalmente a la potencia instalada.
     Relaciona el pico de consumo con la potencia pico fotovoltaica (ratio ~1.2).
     Incluye: Curvas de arranque, hora de almuerzo, estacionalidad térmica y ruido de alta frecuencia.
+    Excluye: cargas gestionables (carretillas, baterías, procesos programables) 
+    para permitir la optimización posterior del balance energético.
     """
     try:
         dt = pd.to_datetime(forecast_time)
@@ -268,7 +270,7 @@ def calculate_industrial_consumption(forecast_time, nominal_load_kw, temp_ambien
         # 2. Lógica de Actividad por Procesos (Baseline)
         if weekday < 5:  # Lunes a Viernes
             if 0 <= hour < 5:
-                base_factor = 0.15  # Solo servicios críticos y seguridad
+                base_factor = 0.10  # Solo servicios críticos y seguridad
             elif 5 <= hour < 6:
                 base_factor = 0.40  # Pre-arranque y climatización de naves
             elif 6 <= hour < 9:
@@ -280,9 +282,9 @@ def calculate_industrial_consumption(forecast_time, nominal_load_kw, temp_ambien
             elif 15 <= hour < 18:
                 base_factor = 0.90  # Turno 2 - Máxima producción
             elif 18 <= hour < 22:
-                base_factor = 0.65  # Turno tarde - Limpieza y procesos secundarios
+                base_factor = 0.60  # Turno tarde - Limpieza y procesos secundarios
             else:
-                base_factor = 0.25  # Cierre y carga de carretillas eléctricas
+                base_factor = 0.12  # Cierre
         else:  # Fin de semana
             base_factor = 0.10 if weekday == 6 else 0.20 # Domingo casi muerto, Sábado guardia
 

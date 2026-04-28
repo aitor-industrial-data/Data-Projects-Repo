@@ -117,7 +117,7 @@ def transform_clients_bronze_to_silver(df_raw: pd.DataFrame) -> pd.DataFrame:
         # 7. Rellenar el resto de nulos con valores coherentes
         fill_values = {
             'description': 'unknown',
-            'nominal_load_kw': df['pv_peak_power_kw']*1.3,
+            'nominal_load_kw': df['pv_peak_power_kw']*1.3, # Sobredimensionamiento del 30% para compensar pérdidas térmicas (derating) y maximizar carga de baterías.
             'panel_area_m2': 0.0,
             'efficiency': 0.15,       # Valor estándar de eficiencia (15%)
             'panel_type': 'unknown',
