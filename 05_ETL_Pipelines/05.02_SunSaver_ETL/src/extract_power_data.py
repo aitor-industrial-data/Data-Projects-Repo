@@ -79,7 +79,7 @@ def transform_pv_generation(df_raw: pd.DataFrame) -> pd.DataFrame:
                 dni = 0.0
                 dhi = 0.0
                 poa = 0.0
-                p_out = 0.0
+                p_gen = 0.0
             else:
                # Si el sol está lo suficientemente alto para generar energía y cálculos fiables:
                 
@@ -91,12 +91,14 @@ def transform_pv_generation(df_raw: pd.DataFrame) -> pd.DataFrame:
                 
                 # 3. Transponer las componentes al plano del panel (POA) considerando ángulo, orientación y albedo
                 poa = pvgen.calculate_total_poa(dni, dhi, ghi, alfa, azimuth, row['angle'], row['aspect'])
-
+                
                 # 4. Calcular la temperatura de operación de la célula (Tcell) integrando el enfriamiento por convección (Viento)
                 t_cell = pvgen.calculate_t_cell(row['temp_celsius'], row['wind_speed_mps'], poa)
                 
                 # 5. Calcular la potencia final (AC/DC) aplicando coeficientes de temperatura y pérdidas de eficiencia del sistema
-                p_out, pr = pvgen.calculate_power_output(poa, t_cell, row['peak_power_kw'], row['loss_pct'])
+                p_gen, pr = pvgen.calculate_power_output(poa, t_cell, row['pv_peak_power_kw'], row['loss_pct'])
+                
+                p_con = pvgen.calculate_industrial_consumption(row['forecast_time'], row['nominal_load_kw'], row['temp_celsius'])
             
             entry = {
                 'client_id': row['client_id'],
@@ -104,14 +106,19 @@ def transform_pv_generation(df_raw: pd.DataFrame) -> pd.DataFrame:
                 'forecast_time': row['forecast_time'],
                 't_cell_celsius': round(t_cell,3),
                 'poa_wm2': round(poa, 3),
-                'power_gen_kw': round(p_out, 3),
-                'performance_ratio': round(pr, 3),
+                'pv_power_gen_kw': round(p_gen, 3),
+                'pv_performance_ratio': round(pr, 3),
+                'power_con_kw': round(p_con, 3),
+                'self_consumption_kw':round(min(p_gen, p_con),3),
+                'grid_export_kw':round(max(0, p_gen - p_con),3),
+                'grid_import_kw':round(max(0, p_con - p_gen),3),
                 'calculated_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 }
             
             data_to_clean.append(entry)
-                
+            
         df = pd.DataFrame(data_to_clean)
+        
         return df
     
 
@@ -129,7 +136,7 @@ def load_generation_to_silver(df: pd.DataFrame, table_name: str = "calculated_ge
     
     try:
         if df.empty:
-            logger.warning(f"⚠️ DataFrame de generación vacío para '{table_name}'.")
+            logger.warning(f"⚠️  DataFrame de generación vacío para '{table_name}'.")
             return False
 
         # 1. Preparación de datos (Copia para no mutar el original)
@@ -145,14 +152,18 @@ def load_generation_to_silver(df: pd.DataFrame, table_name: str = "calculated_ge
             # 2. Creación de tabla específica para GENERACIÓN
             create_table_query = f"""
             CREATE TABLE IF NOT EXISTS {table_name} (
-                client_id           TEXT NOT NULL,
-                unix_time           INTEGER NOT NULL,
-                forecast_time       TEXT NOT NULL,
-                power_gen_kw        REAL,
-                performance_ratio   REAL,
-                poa_wm2             REAL,
-                t_cell_celsius      REAL,
-                calculated_at       TEXT NOT NULL,
+                client_id               TEXT NOT NULL,
+                unix_time               INTEGER NOT NULL,
+                forecast_time           TEXT NOT NULL,
+                pv_power_gen_kw         REAL,
+                pv_performance_ratio    REAL,
+                poa_wm2                 REAL,
+                t_cell_celsius          REAL,
+                power_con_kw            REAL,
+                self_consumption_kw     REAL,
+                grid_export_kw          REAL,
+                grid_import_kw          REAL,
+                calculated_at           TEXT NOT NULL,
                 PRIMARY KEY (client_id, unix_time)
             )
             """

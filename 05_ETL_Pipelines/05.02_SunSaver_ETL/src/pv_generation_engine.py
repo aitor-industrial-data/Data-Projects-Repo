@@ -214,14 +214,14 @@ def calculate_t_cell(temp_ambient, wind_speed, poa):
         return float(temp_ambient)
 
 
-def calculate_power_output(g_total, t_cell, peak_power, loss_pct):
+def calculate_power_output(poa, t_cell, peak_power, loss_pct):
     """
     Calcula la potencia de salida (kW) y el Performance Ratio (PR)
     aplicando correcciones térmicas y pérdidas.
     """
     try:
         # 1. Validación inicial: Si no hay radiación, la salida es 0
-        if g_total <= 0:
+        if poa <= 0:
             return 0.0, 0.0
 
         # 2. Parámetros físicos estándar
@@ -237,7 +237,7 @@ def calculate_power_output(g_total, t_cell, peak_power, loss_pct):
 
         # 5. Potencia de salida (kW)
         # Normalizamos la irradiación (g_total / 1000) porque peak_power está definida a 1000 W/m2
-        p_out = (g_total / 1000) * peak_power * pr
+        p_out = (poa / 1000) * peak_power * pr
         
         return float(max(0, p_out)), float(pr)
 
@@ -246,7 +246,107 @@ def calculate_power_output(g_total, t_cell, peak_power, loss_pct):
         # En producción, podrías usar un logging profesional aquí.
         logger.warning(f"Error en el cálculo de potencia: {e}")
         return 0.0, 0.0
+    
+
+def calculate_industrial_consumption(forecast_time, nominal_load_kw, temp_ambient_celsius):
+    """
+    Simulación de alta fidelidad de consumo industrial.
+    Simula el consumo de una fábrica escalado proporcionalmente a la potencia instalada.
+    Relaciona el pico de consumo con la potencia pico fotovoltaica (ratio ~1.2).
+    Incluye: Curvas de arranque, hora de almuerzo, estacionalidad térmica y ruido de alta frecuencia.
+    """
+    try:
+        dt = pd.to_datetime(forecast_time)
+        hour = dt.hour
+        minute = dt.minute # Para mayor resolución si fuera necesario
+        weekday = dt.weekday()
+        
+        # 1. Definir el Techo de Consumo (Escala)
+        # Una fábrica sana suele tener un pico de demanda un 20-30% mayor que su instalación PV
+        max_factory_demand = nominal_load_kw 
+
+        # 2. Lógica de Actividad por Procesos (Baseline)
+        if weekday < 5:  # Lunes a Viernes
+            if 0 <= hour < 5:
+                base_factor = 0.15  # Solo servicios críticos y seguridad
+            elif 5 <= hour < 6:
+                base_factor = 0.40  # Pre-arranque y climatización de naves
+            elif 6 <= hour < 9:
+                base_factor = 0.95  # Arranque de maquinaria (Pico de carga)
+            elif 9 <= hour < 13:
+                base_factor = 0.85  # Operación estable Turno 1
+            elif 13 <= hour < 15:
+                base_factor = 0.60  # PARADA DE ALMUERZO (El "valle" que engaña al PV)
+            elif 15 <= hour < 18:
+                base_factor = 0.90  # Turno 2 - Máxima producción
+            elif 18 <= hour < 22:
+                base_factor = 0.65  # Turno tarde - Limpieza y procesos secundarios
+            else:
+                base_factor = 0.25  # Cierre y carga de carretillas eléctricas
+        else:  # Fin de semana
+            base_factor = 0.10 if weekday == 6 else 0.20 # Domingo casi muerto, Sábado guardia
+
+        # 3. Componente Termoeléctrica (HVAC)
+        # Si hace más de 25°C o menos de 15°C, las máquinas de climatizacion consumen más.
+        thermal_load = 0
+        if temp_ambient_celsius > 25:
+            thermal_load = (temp_ambient_celsius - 25) * 0.02  # +2% de consumo por cada grado extra
+        elif temp_ambient_celsius < 15:
+            thermal_load = (15 - temp_ambient_celsius) * 0.01  # +1% por calefacción/resistencias
+
+        # 4. Composición Final con Ruido "Browniano" (Gausiano)
+        # No usamos uniform, usamos normal para que los valores extremos sean raros
+        variability = np.random.normal(1.0, 0.03) # Desviación estándar del 3%
+        
+        total_consumption = max_factory_demand * (base_factor + thermal_load) * variability
+
+        return float(max(0, total_consumption))
+
+    except Exception as e:
+        logger.error(f"Error calculando consumo industrial: {e}")
+        return 0.0
 
 
-#if __name__ == "__main__":
+if __name__ == "__main__":
+
+    lat=42.803852359174265
+    lon=-1.701961806168645
+    forecast_time='2026-05-01 15:00:00'
+    pv_peak_power= 16
+    loss_pct=14
+    clouds_pct=82
+    weather_id=803
+    angle=30
+    aspect=0
+    temp_ambient=20.29
+    wind_speed=5.54
+
+    logger.info(f"Calculando posición del sol...")
+    alfa, azimuth=calculate_solar_position(lat, lon, forecast_time)
+    logger.info(f"alfa = {alfa}, azhimut = {azimuth}")
+
+    logger.info(f"Calculando Irradiancia Global Horizontal (GHI)...")
+    ghi=calculate_ghi(alfa, clouds_pct, weather_id)
+    logger.info(f"Global Horizontal Irradiance (GHI) = {ghi} W/m²")
+
+    logger.info(f"Calculando Direct Normal Irradiance (DNI) y Diffuse Horizontal Irradiance (DHI)...")
+    dni, dhi=decompose_erbs(ghi, alfa, forecast_time)
+    logger.info(f"Direct Normal Irradiance (DNI) = {dni} W/m², Diffuse Horizontal Irradiance (DHI) = {dhi} W/m²")
+
+    logger.info(f"Calculando POA irradiance (POA)...")
+    poa=calculate_total_poa(dni, dhi, ghi, alfa, azimuth, angle, aspect)
+    logger.info(f"POA irradiance (POA) = {poa} W/m²")
+
+    logger.info(f"Calculando temperatura de celula (T_CELL)...")
+    tcell=calculate_t_cell(temp_ambient, wind_speed, poa)
+    logger.info(f"Temperatura de celula(T_CELL) = {tcell} celsius")
+
+    logger.info(f"Calculando potencia de generacion...")
+    p_gen, pr=calculate_power_output(poa, tcell, pv_peak_power, loss_pct)
+    logger.info(f"Potencia de generacion = {p_gen} kw, Performance ratio = {pr}")
+
+    logger.info(f"Calculando potencia de consumo...")
+    p_con=calculate_industrial_consumption(forecast_time, pv_peak_power, temp_ambient)
+    logger.info(f"Potencia de consumo = {p_con} kw")
+
 

@@ -3,7 +3,7 @@ import extract_clients as ec
 import transform_clients as tc
 import extract_openweather as ew
 import transform_openweather as tw
-import extract_generation_data as eg
+import extract_power_data as eg
 import db_manager as dm
 
 

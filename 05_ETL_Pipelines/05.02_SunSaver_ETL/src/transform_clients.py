@@ -50,13 +50,13 @@ def transform_clients_bronze_to_silver(df_raw: pd.DataFrame) -> pd.DataFrame:
 
         # 1. Definir columnas por tipo para procesamiento masivo
         numeric_cols = [
-            'latitude', 'longitude', 'peak_power_kw', 'panel_area_m2', 
+            'latitude', 'longitude', 'nominal_load_kw', 'pv_peak_power_kw', 'panel_area_m2', 
             'efficiency', 'loss_pct', 'angle', 'aspect', 
             'battery_capacity_kwh', 'soc_min_pct', 'installation_cost_eur'
         ]
         
         text_cols = [
-            'client_id', 'name', 'panel_type', 'mounting', 'timezone', '_ingested_at'
+            'client_id', 'name', 'description', 'panel_type', 'mounting', 'timezone', '_ingested_at'
         ]
 
         # 2. Forzar tipos de datos (Lo que no cuadre se convierte en NaN)
@@ -71,7 +71,7 @@ def transform_clients_bronze_to_silver(df_raw: pd.DataFrame) -> pd.DataFrame:
 
         # 4. Borrar líneas si los campos CRÍTICOS son nulos
         # client_id, name, latitude, longitude, peak_power_kw
-        critical_fields = ['client_id', 'name', 'latitude', 'longitude', 'peak_power_kw', '_ingested_at']
+        critical_fields = ['client_id', 'name', 'latitude', 'longitude', 'pv_peak_power_kw', '_ingested_at']
         df = df.dropna(subset=critical_fields)
         
         # ==========================================================
@@ -100,7 +100,7 @@ def transform_clients_bronze_to_silver(df_raw: pd.DataFrame) -> pd.DataFrame:
         df.loc[~df['efficiency'].between(0, 1), 'efficiency'] = 0.15
 
         # Evitar valores negativos o absurdos
-        df = df[df['peak_power_kw'] > 0] # Borra potencia negativa
+        df = df[df['pv_peak_power_kw'] > 0] # Borra potencia negativa
         df.loc[df['panel_area_m2'] < 0, 'panel_area_m2'] = 0
         df.loc[df['battery_capacity_kwh'] < 0, 'battery_capacity_kwh'] = 0
         df.loc[df['installation_cost_eur'] < 0, 'installation_cost_eur'] = 0
@@ -116,6 +116,8 @@ def transform_clients_bronze_to_silver(df_raw: pd.DataFrame) -> pd.DataFrame:
 
         # 7. Rellenar el resto de nulos con valores coherentes
         fill_values = {
+            'description': 'unknown',
+            'nominal_load_kw': df['pv_peak_power_kw']*1.3,
             'panel_area_m2': 0.0,
             'efficiency': 0.15,       # Valor estándar de eficiencia (15%)
             'panel_type': 'unknown',
@@ -130,6 +132,7 @@ def transform_clients_bronze_to_silver(df_raw: pd.DataFrame) -> pd.DataFrame:
         }
         
         df = df.fillna(value=fill_values)
+
         return df.reset_index(drop=True)
     
     except Exception as e:  
@@ -161,9 +164,11 @@ def load_df_to_db(df: pd.DataFrame, table_name: str = "clean_clients") -> bool:
             CREATE TABLE IF NOT EXISTS {table_name} (
                     client_id               TEXT NOT NULL PRIMARY KEY,
                     name                    TEXT NOT NULL,
+                    description             TEXT NOT NULL,
                     latitude                REAL NOT NULL,
                     longitude               REAL NOT NULL,
-                    peak_power_kw           REAL NOT NULL,
+                    nominal_load_kw         REAL NOT NULL,
+                    pv_peak_power_kw        REAL NOT NULL,
                     panel_area_m2           REAL NOT NULL,
                     efficiency              REAL NOT NULL,
                     panel_type              TEXT NOT NULL,
