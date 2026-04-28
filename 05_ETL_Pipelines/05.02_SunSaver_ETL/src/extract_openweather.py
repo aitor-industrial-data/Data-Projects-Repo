@@ -83,7 +83,7 @@ def extract_weather(lat: float, lon: float)-> Dict[str, Any]:
         raise
 
 
-def ingest_openweather_to_bronze(api_response: dict, table_name: str, client_id: str) -> bool:
+def ingest_openweather_to_bronze(api_response: dict, table_name: str , client_id: str) -> bool:
     """
     Capa Bronce: Carga los datos crudos de la API y añade 
     metadatos de auditoría (_ingested_at).
@@ -104,7 +104,12 @@ def ingest_openweather_to_bronze(api_response: dict, table_name: str, client_id:
         
 
         with sqlite3.connect(str(db_path)) as conn:
+            # Insertamos los datos
             df.to_sql(table_name, conn, if_exists='append', index=False)
+
+            # ASEGURAMOS EL INDICE (Se ejecuta siempre, pero solo actúa si no existe)
+            index_query = f"CREATE INDEX IF NOT EXISTS idx_ingested_at ON {table_name} (_ingested_at);"
+            conn.execute(index_query)
 
         logger.info(f"✅ Ingesta exitosa: {len(df)} registros añadidos a base de datos.")
         return True
@@ -114,7 +119,7 @@ def ingest_openweather_to_bronze(api_response: dict, table_name: str, client_id:
         return False
 
 
-def extract_all_clients_weather(client_table: str, weather_table: str) -> bool:
+def extract_openweather(client_table: str = 'clean_clients', weather_table: str = 'raw_weather') -> bool:
     try:
 
         db_path = db_manager.get_db_path()
@@ -156,6 +161,6 @@ def extract_all_clients_weather(client_table: str, weather_table: str) -> bool:
 if __name__ == "__main__":
     
     # Extre datos openweather de para cada client_id (clean_clients) de una tabla y lo inyecta en otra tabla (raw_weather)
-    extract_all_clients_weather('clean_clients', 'raw_weather')
+    extract_openweather()
 
 

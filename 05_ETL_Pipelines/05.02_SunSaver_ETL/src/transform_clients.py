@@ -16,7 +16,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
     
 
-def extract_from_db(table_name: str) -> pd.DataFrame:
+def extract_from_db(table_name: str = 'raw_clients') -> pd.DataFrame:
     """
     Lee los datos de la tabla y los devuelve como DataFrame.
     """
@@ -130,18 +130,15 @@ def transform_clients_bronze_to_silver(df_raw: pd.DataFrame) -> pd.DataFrame:
         }
         
         df = df.fillna(value=fill_values)
-
         return df.reset_index(drop=True)
     
-    except Exception as e:
-        
+    except Exception as e:  
         logger.error(f"❌ ERROR CRÍTICO en la transformación Silver: {e}")
-       
         return pd.DataFrame()
 
 
     
-def load_df_to_db(df: pd.DataFrame, table_name: str):
+def load_df_to_db(df: pd.DataFrame, table_name: str = "clean_clients") -> bool:
     """
     Inyecta un DataFrame en la base de datos SQLite definiendo client_id como PK.
     """
@@ -162,11 +159,11 @@ def load_df_to_db(df: pd.DataFrame, table_name: str):
             # Ajusta los tipos de datos según tus necesidades técnicas
             create_table_query = f"""
             CREATE TABLE IF NOT EXISTS {table_name} (
-                    client_id               TEXT PRIMARY KEY,
+                    client_id               TEXT NOT NULL PRIMARY KEY,
                     name                    TEXT NOT NULL,
                     latitude                REAL NOT NULL,
                     longitude               REAL NOT NULL,
-                    peak_power_kw           REAL NOT NULL,   
+                    peak_power_kw           REAL NOT NULL,
                     panel_area_m2           REAL NOT NULL,
                     efficiency              REAL NOT NULL,
                     panel_type              TEXT NOT NULL,
@@ -194,16 +191,30 @@ def load_df_to_db(df: pd.DataFrame, table_name: str):
         return False
 
 
-def transform_clients(raw_clients_table: str, clean_clients_table:str) -> bool:
-    raw_clients=extract_from_db(raw_clients_table)
-    clean_clients=transform_clients_bronze_to_silver(raw_clients)
-    load_df_to_db(clean_clients, clean_clients_table)
+def transform_clients() -> bool:
+    try:
+        # 1. Extracción (Capa Bronze)
+        raw_clients = extract_from_db()
+        
+        # 2. Transformación (Limpieza y tipos)
+        clean_clients = transform_clients_bronze_to_silver(raw_clients)
+        
+        # 3. Carga (Capa Silver)
+        load_df_to_db(clean_clients)
+        
+        return True
+
+    except Exception as e:
+        # Registramos el error con detalle para debuguear después
+        logger.error(f"❌ Error crítico en el pipeline de transform_clients: {e}")
+        return False
+    
 
 
 if __name__ == "__main__":
 
     logger.info(f"Iniciando extraccion e ingesta de clientes de capa bronze a silver...")
-    transform_clients('raw_clients', 'clean_clients')
+    transform_clients()
     
 
     

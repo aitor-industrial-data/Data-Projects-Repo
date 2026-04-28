@@ -50,7 +50,7 @@ def extract_clients_from_excel() -> list[dict]:
 
 
 
-def ingest_clients_to_bronze(client_list: list[dict], table_name: str) -> bool:
+def ingest_clients_to_bronze(client_list: list[dict], table_name: str = 'raw_clients') -> bool:
     """
     Capa Bronce: Carga los datos crudos del Excel y añade 
     metadatos de auditoría (_ingested_at).
@@ -79,13 +79,13 @@ def ingest_clients_to_bronze(client_list: list[dict], table_name: str) -> bool:
         return False
 
 
-def extract_clients (table_name: str) -> bool:
+def extract_clients () -> bool:
     #extrae e inyecta clientes en capa bronce de db
     clients=extract_clients_from_excel()
-    ingest_clients_to_bronze(clients, table_name)
+    ingest_clients_to_bronze(clients)
 
 
 if __name__ == "__main__":
     logger.info(f"Iniciando extraccion e ingesta de clientes en base de datos...")
-    extract_clients('raw_clients')
+    extract_clients()
     
