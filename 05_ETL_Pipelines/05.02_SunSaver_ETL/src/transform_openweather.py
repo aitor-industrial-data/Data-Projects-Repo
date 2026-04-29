@@ -29,15 +29,15 @@ def extract_raw_weather_from_db(table_name: str = 'raw_weather') -> pd.DataFrame
             WITH RankedData AS (
                 SELECT 
                     client_id, 
-                    _ingested_at, 
+                    _ingested_at_utc, 
                     raw_data,
                     ROW_NUMBER() OVER (
                         PARTITION BY client_id 
-                        ORDER BY _ingested_at DESC
+                        ORDER BY _ingested_at_utc DESC
                     ) as rn
                 FROM {table_name}
             )
-            SELECT client_id, _ingested_at, raw_data
+            SELECT client_id, _ingested_at_utc, raw_data
             FROM RankedData
             WHERE rn = 1
             """
@@ -66,7 +66,7 @@ def transform_weather_bronze_to_silver(df_raw: pd.DataFrame) -> pd.DataFrame:
     
         for index, row in df.iterrows():
             client_id = row['client_id']
-            ingested_at = row['_ingested_at']
+            ingested_at_utc = row['_ingested_at_utc']
 
             # Convertimos el string de nuevo a diccionario
             raw_json = json.loads(row['raw_data'])
@@ -88,7 +88,7 @@ def transform_weather_bronze_to_silver(df_raw: pd.DataFrame) -> pd.DataFrame:
                     'weather_main': f.get('weather', [{}])[0].get('main'),
                     'weather_description': f.get('weather', [{}])[0].get('description'),
                     'is_daylight': 1 if f.get('sys', {}).get('pod') == 'd' else 0,
-                    '_ingested_at': ingested_at
+                    '_ingested_at_utc': ingested_at_utc
                 }
                 data_to_clean.append(entry)
                 
@@ -100,7 +100,7 @@ def transform_weather_bronze_to_silver(df_raw: pd.DataFrame) -> pd.DataFrame:
 
         # 1. TIPADO: Convertir a datetime para poder operar con fechas
         df['forecast_time_utc'] = pd.to_datetime(df['forecast_time_utc'], errors='coerce')
-        df['_ingested_at'] = pd.to_datetime(df['_ingested_at'], errors='coerce')
+        df['_ingested_at_utc'] = pd.to_datetime(df['_ingested_at_utc'], errors='coerce')
         
         # 2. NULOS: Si no hay probabilidad de lluvia, es 0. 
         # Si no hay temperatura, llenamos con la anterior (ffill) o 0
@@ -110,7 +110,7 @@ def transform_weather_bronze_to_silver(df_raw: pd.DataFrame) -> pd.DataFrame:
         # 3. DEDUPLICACIÓN (Vital en tu caso):
         # Como has lanzado el robot varias veces, tienes el mismo pronóstico repetido.
         # Ordenamos por fecha de ingesta y nos quedamos con la última versión de cada pronóstico.
-        df = df.sort_values(by=['client_id', 'forecast_time_utc', '_ingested_at'], ascending=[True, True, False])
+        df = df.sort_values(by=['client_id', 'forecast_time_utc', '_ingested_at_utc'], ascending=[True, True, False])
         df = df.drop_duplicates(subset=['client_id', 'forecast_time_utc'], keep='first')
 
 
@@ -141,7 +141,7 @@ def load_weather_to_silver(df: pd.DataFrame, table_name: str = "clean_weather") 
         # Convertimos los objetos Timestamp de Pandas a String (formato ISO)
         # Esto soluciona el error: "type 'Timestamp' is not supported"
         df_sql['forecast_time_utc'] = df_sql['forecast_time_utc'].dt.strftime('%Y-%m-%d %H:%M:%S')
-        df_sql['_ingested_at'] = df_sql['_ingested_at'].dt.strftime('%Y-%m-%d %H:%M:%S')
+        df_sql['_ingested_at_utc'] = df_sql['_ingested_at_utc'].dt.strftime('%Y-%m-%d %H:%M:%S')
 
         engine = create_engine(f"sqlite:///{db_path}")
 
@@ -163,7 +163,7 @@ def load_weather_to_silver(df: pd.DataFrame, table_name: str = "clean_weather") 
                 weather_main            TEXT,
                 weather_description     TEXT,
                 is_daylight             INTEGER,
-                _ingested_at            TEXT NOT NULL,
+                _ingested_at_utc        TEXT NOT NULL,
                 PRIMARY KEY (client_id, unix_time)
             )
             """

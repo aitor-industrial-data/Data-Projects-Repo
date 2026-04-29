@@ -1,6 +1,6 @@
 import pandas as pd
 import pvlib
-from datetime import datetime
+from datetime import datetime, timezone
 import sqlite3
 import json
 import logging
@@ -113,7 +113,7 @@ def transform_pv_generation(df_raw: pd.DataFrame) -> pd.DataFrame:
                 'self_consumption_kw':round(min(p_gen, p_con),3),
                 'grid_export_kw':round(max(0, p_gen - p_con),3),
                 'grid_import_kw':round(max(0, p_con - p_gen),3),
-                'calculated_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                'calculated_at_utc': datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
                 }
             
             data_to_clean.append(entry)
@@ -164,7 +164,7 @@ def load_generation_to_silver(df: pd.DataFrame, table_name: str = "calculated_ge
                 self_consumption_kw     REAL,
                 grid_export_kw          REAL,
                 grid_import_kw          REAL,
-                calculated_at           TEXT NOT NULL,
+                calculated_at_utc       TEXT NOT NULL,
                 PRIMARY KEY (client_id, unix_time)
             )
             """

@@ -27,10 +27,10 @@ def extract_raw_ree_from_db(table_name: str = 'raw_prices') -> pd.DataFrame:
             # 2. Leemos la tabla entera directamente a un DataFrame
             query = f"""
                 SELECT  
-                    _ingested_at, 
+                    _ingested_at_utc, 
                     raw_data
                 FROM {table_name}
-                ORDER BY _ingested_at DESC
+                ORDER BY _ingested_at_utc DESC
                 LIMIT 1
                 """
             df = pd.read_sql_query(query, conn)
@@ -57,7 +57,7 @@ def transform_prices_bronze_to_silver(df_raw: pd.DataFrame) -> pd.DataFrame:
         data_to_clean = []
         
         for index, row in df_raw.iterrows():
-            ingested_at = row['_ingested_at']
+            ingested_at_utc = row['_ingested_at_utc']
             # Cargamos el JSON de la columna raw_data
             raw_json = json.loads(row['raw_data'])
             
@@ -71,10 +71,10 @@ def transform_prices_bronze_to_silver(df_raw: pd.DataFrame) -> pd.DataFrame:
                 for v in values:
                     entry = {
                         'price_type': price_type,
-                        'datetime': v.get('datetime'),
+                        'datetime_utc': v.get('datetime'),
                         'price_euro_mwh': float(v.get('value')),
                         'percentage': v.get('percentage'),
-                        '_ingested_at': ingested_at
+                        '_ingested_at_utc': ingested_at_utc
                     }
                     data_to_clean.append(entry)
         
@@ -82,10 +82,10 @@ def transform_prices_bronze_to_silver(df_raw: pd.DataFrame) -> pd.DataFrame:
         
         if not df.empty:
             # 1. Normalización de fechas
-            df['datetime'] = pd.to_datetime(df['datetime'], errors='coerce', utc=True)
+            df['datetime_utc'] = pd.to_datetime(df['datetime_utc'], errors='coerce', utc=True)
             
             # 2. Limpieza: Eliminar filas donde la fecha falló
-            df = df.dropna(subset=['datetime'])
+            df = df.dropna(subset=['datetime_utc'])
             
             # 3. Manejo de Outliers (Límites lógicos para el mercado español)
             # El precio rara vez baja de -50 o sube de 1000 en condiciones normales
@@ -98,18 +98,18 @@ def transform_prices_bronze_to_silver(df_raw: pd.DataFrame) -> pd.DataFrame:
                 df = df[(df['price_euro_mwh'] >= lower_limit) & (df['price_euro_mwh'] <= upper_limit)]
 
             # 4. Deduplicación
-            # Mantenemos el registro más reciente según _ingested_at
-            df = df.sort_values('_ingested_at', ascending=False)
-            df = df.drop_duplicates(subset=['price_type', 'datetime'], keep='first')
+            # Mantenemos el registro más reciente según _ingested_at_utc
+            df = df.sort_values('_ingested_at_utc', ascending=False)
+            df = df.drop_duplicates(subset=['price_type', 'datetime_utc'], keep='first')
             
             # Ordenar para facilitar la lectura/carga
-            df = df.sort_values(['price_type', 'datetime']).reset_index(drop=True)
+            df = df.sort_values(['price_type', 'datetime_utc']).reset_index(drop=True)
 
             # 5. Rellenamos los precios nulos con interpolación
             df['price_euro_mwh'] = df.groupby('price_type')['price_euro_mwh'].transform(lambda x: x.interpolate(method='linear').ffill().bfill())
 
             # 6. Creamos la columna unix_time
-            df['unix_time'] = df['datetime'].dt.tz_localize(None).astype('datetime64[s]').astype('int64')
+            df['unix_time'] = df['datetime_utc'].dt.tz_localize(None).astype('datetime64[s]').astype('int64')
             
             logger.info(f"✅ Transformación Silver completada: {len(df)} registros válidos.")
         
@@ -132,12 +132,12 @@ def load_ree_to_silver(df: pd.DataFrame, table_name: str = "clean_prices") -> bo
         
         # ASEGURAMOS CONVERSIÓN A DATETIME antes de usar .dt
         # Esto soluciona el error que comentas
-        df_sql['datetime'] = pd.to_datetime(df_sql['datetime'])
-        df_sql['_ingested_at'] = pd.to_datetime(df_sql['_ingested_at'])
+        df_sql['datetime_utc'] = pd.to_datetime(df_sql['datetime_utc'])
+        df_sql['_ingested_at_utc'] = pd.to_datetime(df_sql['_ingested_at_utc'])
 
         # Ahora sí podemos usar .dt.strftime
-        df_sql['datetime'] = df_sql['datetime'].dt.strftime('%Y-%m-%d %H:%M:%S')
-        df_sql['_ingested_at'] = df_sql['_ingested_at'].dt.strftime('%Y-%m-%d %H:%M:%S')
+        df_sql['datetime_utc'] = df_sql['datetime_utc'].dt.strftime('%Y-%m-%d %H:%M:%S')
+        df_sql['_ingested_at_utc'] = df_sql['_ingested_at_utc'].dt.strftime('%Y-%m-%d %H:%M:%S')
         
 
         engine = create_engine(f"sqlite:///{db_path}")
@@ -149,12 +149,12 @@ def load_ree_to_silver(df: pd.DataFrame, table_name: str = "clean_prices") -> bo
             create_table_query = f"""
             CREATE TABLE IF NOT EXISTS {table_name} (
                 unix_time           INTEGER NOT NULL,
-                datetime            TEXT NOT NULL,
+                datetime_utc        TEXT NOT NULL,
                 price_type          TEXT NOT NULL,
                 price_euro_mwh      REAL,
                 percentage          REAL,
-                _ingested_at        TEXT NOT NULL,
-                PRIMARY KEY (datetime, price_type)
+                _ingested_at_utc    TEXT NOT NULL,
+                PRIMARY KEY (datetime_utc, price_type)
             )
             """
             

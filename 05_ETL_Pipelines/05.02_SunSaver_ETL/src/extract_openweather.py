@@ -23,7 +23,7 @@ import os
 import sys
 import pandas as pd
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any
 from dotenv import load_dotenv
 
@@ -86,19 +86,19 @@ def extract_weather(lat: float, lon: float)-> Dict[str, Any]:
 def ingest_openweather_to_bronze(api_response: dict, table_name: str , client_id: str) -> bool:
     """
     Capa Bronce: Carga los datos crudos de la API y añade 
-    metadatos de auditoría (_ingested_at).
+    metadatos de auditoría (_ingested_at_utc).
     """
     try:
         db_path = db_manager.get_db_path()
 
         # Convertimos el diccionario entero a un String de texto
         raw_json_str = json.dumps(api_response, ensure_ascii=False)
-        ingested_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        ingested_at_utc = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
         
         # Creamos un DataFrame de una sola fila y dos columnas
         df = pd.DataFrame([{
             'client_id': client_id,
-            '_ingested_at': ingested_at,
+            '_ingested_at_utc': ingested_at_utc,
             'raw_data': raw_json_str
         }])
         
@@ -108,7 +108,7 @@ def ingest_openweather_to_bronze(api_response: dict, table_name: str , client_id
             df.to_sql(table_name, conn, if_exists='append', index=False)
 
             # ASEGURAMOS EL INDICE (Se ejecuta siempre, pero solo actúa si no existe)
-            index_query = f"CREATE INDEX IF NOT EXISTS idx_ingested_at ON {table_name} (_ingested_at);"
+            index_query = f"CREATE INDEX IF NOT EXISTS idx_ingested_at_utc ON {table_name} (_ingested_at_utc);"
             conn.execute(index_query)
 
         logger.info(f"✅ Ingesta exitosa: {len(df)} registros añadidos a base de datos.")

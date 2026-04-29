@@ -56,7 +56,7 @@ def transform_clients_bronze_to_silver(df_raw: pd.DataFrame) -> pd.DataFrame:
         ]
         
         text_cols = [
-            'client_id', 'name', 'description', 'panel_type', 'mounting', 'timezone', '_ingested_at'
+            'client_id', 'name', 'description', 'panel_type', 'mounting', 'timezone', '_ingested_at_utc'
         ]
 
         # 2. Forzar tipos de datos (Lo que no cuadre se convierte en NaN)
@@ -67,11 +67,11 @@ def transform_clients_bronze_to_silver(df_raw: pd.DataFrame) -> pd.DataFrame:
             df[col] = df[col].astype(str).replace(['None', 'nan', 'NaN', 'null'], np.nan)
         
         # 3. Tratamiento específico para la fecha de ingesta (para poder comparar)
-        df['_ingested_at'] = pd.to_datetime(df['_ingested_at'], errors='coerce')
+        df['_ingested_at_utc'] = pd.to_datetime(df['_ingested_at_utc'], errors='coerce')
 
         # 4. Borrar líneas si los campos CRÍTICOS son nulos
         # client_id, name, latitude, longitude, peak_power_kw
-        critical_fields = ['client_id', 'name', 'latitude', 'longitude', 'pv_peak_power_kw', '_ingested_at']
+        critical_fields = ['client_id', 'name', 'latitude', 'longitude', 'pv_peak_power_kw', '_ingested_at_utc']
         df = df.dropna(subset=critical_fields)
         
         # ==========================================================
@@ -109,10 +109,10 @@ def transform_clients_bronze_to_silver(df_raw: pd.DataFrame) -> pd.DataFrame:
 
         # 6. Gestión de duplicados: nos quedamos con el más reciente
         # Ordenamos por fecha de ingesta (reciente primero) y quitamos duplicados por ID
-        df = df.sort_values(by='_ingested_at', ascending=False)
+        df = df.sort_values(by='_ingested_at_utc', ascending=False)
         df = df.drop_duplicates(subset=['client_id'], keep='first')
         # Acortamos la fecha a formato legible (YYYY-MM-DD HH:MM:SS)
-        df['_ingested_at'] = df['_ingested_at'].dt.strftime('%Y-%m-%d %H:%M:%S')
+        df['_ingested_at_utc'] = df['_ingested_at_utc'].dt.strftime('%Y-%m-%d %H:%M:%S')
 
         # 7. Rellenar el resto de nulos con valores coherentes
         fill_values = {
@@ -180,7 +180,7 @@ def load_df_to_db(df: pd.DataFrame, table_name: str = "clean_clients") -> bool:
                     soc_min_pct             REAL NOT NULL,
                     installation_cost_eur   REAL NOT NULL,
                     timezone                TEXT NOT NULL,
-                    _ingested_at            TEXT NOT NULL
+                    _ingested_at_utc        TEXT NOT NULL
                 )
             """
             connection.execute(text(create_table_query))

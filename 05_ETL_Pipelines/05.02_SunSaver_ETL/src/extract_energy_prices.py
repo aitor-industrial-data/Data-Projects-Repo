@@ -1,7 +1,7 @@
 import requests
 import pandas as pd
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 import json
 import sqlite3
@@ -75,11 +75,11 @@ def ingest_ree_to_bronze(api_response: dict, table_name: str = 'raw_prices') -> 
 
         # 1. Serializamos el JSON completo a una cadena de texto (Raw String)
         raw_json_str = json.dumps(api_response, ensure_ascii=False)
-        ingested_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        ingested_at_utc = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
         
         # 2. Creamos el DataFrame de auditoría
         df = pd.DataFrame([{
-            '_ingested_at': ingested_at,
+            '_ingested_at_utc': ingested_at_utc,
             'raw_data': raw_json_str
         }])
 
@@ -88,7 +88,7 @@ def ingest_ree_to_bronze(api_response: dict, table_name: str = 'raw_prices') -> 
             df.to_sql(table_name, conn, if_exists='append', index=False)
 
             # Aseguramos el índice para búsquedas rápidas por fecha de carga
-            index_query = f"CREATE INDEX IF NOT EXISTS idx_ree_ingested_at ON {table_name} (_ingested_at);"
+            index_query = f"CREATE INDEX IF NOT EXISTS idx_ree_ingested_at_utc ON {table_name} (_ingested_at_utc);"
             conn.execute(index_query)
 
         logger.info(f"✅ Ingesta Bronce REE exitosa en tabla '{table_name}'.")
