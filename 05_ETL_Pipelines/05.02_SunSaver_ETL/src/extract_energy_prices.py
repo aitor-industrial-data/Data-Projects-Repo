@@ -28,14 +28,14 @@ def extract_raw_json_from_ree() -> dict:
     
 
     # Calculamos la fecha de mañana
-    today=datetime.now().strftime("%Y-%m-%d")
+    # today=datetime.now().strftime("%Y-%m-%d")
     tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
     
 
     # Construimos la URL con la fecha de mañana
     url = (
         "https://apidatos.ree.es/es/datos/mercados/precios-mercados-tiempo-real"
-        f"?start_date={today}T00:00&end_date={today}T23:59&time_trunc=hour"
+        f"?start_date={tomorrow}T00:00&end_date={tomorrow}T23:59&time_trunc=hour"
         
     )
 

@@ -128,7 +128,7 @@ def transform_pv_generation(df_raw: pd.DataFrame) -> pd.DataFrame:
         return pd.DataFrame()
 
 
-def load_generation_to_silver(df: pd.DataFrame, table_name: str = "calculated_generation") -> bool:
+def load_generation_to_silver(df: pd.DataFrame, table_name: str = "clean_calculations") -> bool:
     """
     Almacena los cálculos de rendimiento energético en la DB.
     Usa PK compuesta (client_id, unix_time) para evitar duplicados en el histórico.

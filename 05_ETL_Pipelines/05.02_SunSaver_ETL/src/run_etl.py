@@ -6,6 +6,10 @@ import transform_openweather as tw
 import extract_energy_prices as ep
 import transform_energy_prices as tp
 import extract_power_data as eg
+import transform_gold_dim_clients as gc
+import transform_gold_dim_datetime as gd
+import transform_gold_dim_weather as gw
+import transform_gold_fact_energy as ge
 
 
 
@@ -46,3 +50,10 @@ tp.transform_energy_prices()
 
 logger.info(f"Iniciando extraccion de calculos de generacion e ingesta en capa silver...")
 eg.extract_generation_data()
+
+
+logger.info(f"Iniciando transformacion a estructura estrella en capa gold...")
+gc.load_dim_client()
+gd.load_dim_datetime()
+gw.load_dim_weather()
+ge.load_fact_energy_forecast()
