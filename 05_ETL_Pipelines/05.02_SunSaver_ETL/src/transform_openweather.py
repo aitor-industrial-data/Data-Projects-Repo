@@ -78,7 +78,7 @@ def transform_weather_bronze_to_silver(df_raw: pd.DataFrame) -> pd.DataFrame:
                 entry = {
                     'client_id': client_id,
                     'unix_time':int(f.get('dt')),
-                    'forecast_time': f.get('dt_txt'),
+                    'forecast_time_utc': f.get('dt_txt'),
                     'temp_celsius': f.get('main', {}).get('temp'),
                     'humidity_pct': f.get('main', {}).get('humidity'),
                     'clouds_pct': f.get('clouds', {}).get('all'),
@@ -99,19 +99,19 @@ def transform_weather_bronze_to_silver(df_raw: pd.DataFrame) -> pd.DataFrame:
         # ==========================================
 
         # 1. TIPADO: Convertir a datetime para poder operar con fechas
-        df['forecast_time'] = pd.to_datetime(df['forecast_time'], errors='coerce')
+        df['forecast_time_utc'] = pd.to_datetime(df['forecast_time_utc'], errors='coerce')
         df['_ingested_at'] = pd.to_datetime(df['_ingested_at'], errors='coerce')
         
         # 2. NULOS: Si no hay probabilidad de lluvia, es 0. 
         # Si no hay temperatura, llenamos con la anterior (ffill) o 0
         df['rain_prob_norm'] = df['rain_prob_norm'].fillna(0)
-        df = df.dropna(subset=['client_id', 'forecast_time']) # Campos críticos
+        df = df.dropna(subset=['client_id', 'forecast_time_utc']) # Campos críticos
 
         # 3. DEDUPLICACIÓN (Vital en tu caso):
         # Como has lanzado el robot varias veces, tienes el mismo pronóstico repetido.
         # Ordenamos por fecha de ingesta y nos quedamos con la última versión de cada pronóstico.
-        df = df.sort_values(by=['client_id', 'forecast_time', '_ingested_at'], ascending=[True, True, False])
-        df = df.drop_duplicates(subset=['client_id', 'forecast_time'], keep='first')
+        df = df.sort_values(by=['client_id', 'forecast_time_utc', '_ingested_at'], ascending=[True, True, False])
+        df = df.drop_duplicates(subset=['client_id', 'forecast_time_utc'], keep='first')
 
 
         
@@ -140,7 +140,7 @@ def load_weather_to_silver(df: pd.DataFrame, table_name: str = "clean_weather") 
         
         # Convertimos los objetos Timestamp de Pandas a String (formato ISO)
         # Esto soluciona el error: "type 'Timestamp' is not supported"
-        df_sql['forecast_time'] = df_sql['forecast_time'].dt.strftime('%Y-%m-%d %H:%M:%S')
+        df_sql['forecast_time_utc'] = df_sql['forecast_time_utc'].dt.strftime('%Y-%m-%d %H:%M:%S')
         df_sql['_ingested_at'] = df_sql['_ingested_at'].dt.strftime('%Y-%m-%d %H:%M:%S')
 
         engine = create_engine(f"sqlite:///{db_path}")
@@ -153,7 +153,7 @@ def load_weather_to_silver(df: pd.DataFrame, table_name: str = "clean_weather") 
             CREATE TABLE IF NOT EXISTS {table_name} (
                 client_id               TEXT NOT NULL,
                 unix_time               INTEGER NOT NULL,
-                forecast_time           TEXT NOT NULL,
+                forecast_time_utc       TEXT NOT NULL,
                 temp_celsius            REAL,
                 humidity_pct            REAL,
                 clouds_pct              REAL,

@@ -13,14 +13,14 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def calculate_solar_position(latitude, longitude, forecast_time):
+def calculate_solar_position(latitude, longitude, forecast_time_utc):
     """
     Calcula la elevación solar (alfa) y el azimut utilizando pvlib.
     Incluye manejo de excepciones para asegurar la continuidad del ETL.
     """
     try:
         # 1. Convertir forecast_time a objeto datetime de Pandas (UTC)
-        dt = pd.to_datetime(forecast_time, utc=True)
+        dt = pd.to_datetime(forecast_time_utc, utc=True)
         
         # 2. Obtener la posición del sol
         # get_solarposition devuelve un DataFrame con 'elevation', 'azimuth', etc.
@@ -96,7 +96,7 @@ def calculate_ghi(alfa, clouds_pct, weather_id):
         return 0.0
 
 
-def decompose_erbs(ghi, alfa, forecast_time):
+def decompose_erbs(ghi, alfa, forecast_time_utc):
     """
     Descompone la GHI en DNI y DHI utilizando el modelo de Erbs.
     Incluye validación de seguridad y manejo de excepciones.
@@ -107,7 +107,7 @@ def decompose_erbs(ghi, alfa, forecast_time):
             return 0.0, 0.0
 
         # 2. Radiación extraterrestre
-        dni_extra = pvlib.irradiance.get_extra_radiation(pd.to_datetime(forecast_time))
+        dni_extra = pvlib.irradiance.get_extra_radiation(pd.to_datetime(forecast_time_utc))
         
         # 3. Índice de Claridad (kt)
         sin_alfa = np.sin(np.radians(alfa))
@@ -139,7 +139,7 @@ def decompose_erbs(ghi, alfa, forecast_time):
 
     except Exception as e:
         # En un ETL real, aquí podrías usar un logger: logger.error(f"Error en Erbs: {e}")
-        logger.warning(f"Error procesando fila {forecast_time}: {e}")
+        logger.warning(f"Error procesando fila {forecast_time_utc}: {e}")
         return 0.0, 0.0
 
 
@@ -248,7 +248,7 @@ def calculate_power_output(poa, t_cell, peak_power, loss_pct):
         return 0.0, 0.0
     
 
-def calculate_industrial_consumption(forecast_time, nominal_load_kw, temp_ambient_celsius):
+def calculate_industrial_consumption(forecast_time_utc, nominal_load_kw, temp_ambient_celsius):
     """
     Simulación de alta fidelidad de consumo industrial.
     Simula el consumo de una fábrica escalado proporcionalmente a la potencia instalada.
@@ -258,7 +258,7 @@ def calculate_industrial_consumption(forecast_time, nominal_load_kw, temp_ambien
     para permitir la optimización posterior del balance energético.
     """
     try:
-        dt = pd.to_datetime(forecast_time)
+        dt = pd.to_datetime(forecast_time_utc)
         hour = dt.hour
         minute = dt.minute # Para mayor resolución si fuera necesario
         weekday = dt.weekday()

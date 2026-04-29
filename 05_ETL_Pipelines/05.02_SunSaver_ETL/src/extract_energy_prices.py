@@ -28,12 +28,15 @@ def extract_raw_json_from_ree() -> dict:
     
 
     # Calculamos la fecha de mañana
+    today=datetime.now().strftime("%Y-%m-%d")
     tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+    
 
     # Construimos la URL con la fecha de mañana
     url = (
         "https://apidatos.ree.es/es/datos/mercados/precios-mercados-tiempo-real"
-        f"?start_date={tomorrow}T00:00&end_date={tomorrow}T23:59&time_trunc=hour"
+        f"?start_date={today}T00:00&end_date={today}T23:59&time_trunc=hour"
+        
     )
 
     headers = {"Accept": "application/json"}
@@ -55,7 +58,7 @@ def extract_raw_json_from_ree() -> dict:
         return raw_json
 
     except Exception as e:
-        print(f"❌ Error al obtener el JSON crudo: {e}")
+        logger.error(f"❌ Error al obtener el JSON crudo: {e}")
         return None
 
 
@@ -96,8 +99,11 @@ def ingest_ree_to_bronze(api_response: dict, table_name: str = 'raw_prices') -> 
         return False
     
 
-
-if __name__ == "__main__":
+def extract_energy_prices():
     raw_prices = extract_raw_json_from_ree()
     ingest_ree_to_bronze(raw_prices)
+
+
+if __name__ == "__main__":
+    extract_energy_prices()
     

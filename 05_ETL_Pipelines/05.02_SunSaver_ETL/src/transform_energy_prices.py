@@ -14,6 +14,7 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+
 def extract_raw_ree_from_db(table_name: str = 'raw_prices') -> pd.DataFrame:
     """
     Extrae solo la ultima lectura y la devuelve como DataFrame.
@@ -80,12 +81,37 @@ def transform_prices_bronze_to_silver(df_raw: pd.DataFrame) -> pd.DataFrame:
         df = pd.DataFrame(data_to_clean)
         
         if not df.empty:
-            # Convertimos la columna datetime a formato fecha/hora real de Pandas
-            df['datetime'] = pd.to_datetime(df['datetime'], errors='coerce')
-            # Limpieza básica: eliminamos duplicados si los hubiera
-            df = df.drop_duplicates(subset=['price_type', 'datetime'])
+            # 1. Normalización de fechas
+            df['datetime'] = pd.to_datetime(df['datetime'], errors='coerce', utc=True)
             
-            logger.info(f"✅ Transformación Silver completada: {len(df)} registros.")
+            # 2. Limpieza: Eliminar filas donde la fecha falló
+            df = df.dropna(subset=['datetime'])
+            
+            # 3. Manejo de Outliers (Límites lógicos para el mercado español)
+            # El precio rara vez baja de -50 o sube de 1000 en condiciones normales
+            lower_limit = -100
+            upper_limit = 2000
+            
+            outliers = df[(df['price_euro_mwh'] < lower_limit) | (df['price_euro_mwh'] > upper_limit)]
+            if not outliers.empty:
+                logger.warning(f"🚨 Se detectaron {len(outliers)} valores fuera de rango. Filtrando...")
+                df = df[(df['price_euro_mwh'] >= lower_limit) & (df['price_euro_mwh'] <= upper_limit)]
+
+            # 4. Deduplicación
+            # Mantenemos el registro más reciente según _ingested_at
+            df = df.sort_values('_ingested_at', ascending=False)
+            df = df.drop_duplicates(subset=['price_type', 'datetime'], keep='first')
+            
+            # Ordenar para facilitar la lectura/carga
+            df = df.sort_values(['price_type', 'datetime']).reset_index(drop=True)
+
+            # 5. Rellenamos los precios nulos con interpolación
+            df['price_euro_mwh'] = df.groupby('price_type')['price_euro_mwh'].transform(lambda x: x.interpolate(method='linear').ffill().bfill())
+
+            # 6. Creamos la columna unix_time
+            df['unix_time'] = df['datetime'].dt.tz_localize(None).astype('datetime64[s]').astype('int64')
+            
+            logger.info(f"✅ Transformación Silver completada: {len(df)} registros válidos.")
         
         return df
 
@@ -112,6 +138,7 @@ def load_ree_to_silver(df: pd.DataFrame, table_name: str = "clean_prices") -> bo
         # Ahora sí podemos usar .dt.strftime
         df_sql['datetime'] = df_sql['datetime'].dt.strftime('%Y-%m-%d %H:%M:%S')
         df_sql['_ingested_at'] = df_sql['_ingested_at'].dt.strftime('%Y-%m-%d %H:%M:%S')
+        
 
         engine = create_engine(f"sqlite:///{db_path}")
 
@@ -121,6 +148,7 @@ def load_ree_to_silver(df: pd.DataFrame, table_name: str = "clean_prices") -> bo
             # porque tendrías dos precios para el mismo segundo. Usamos clave compuesta.
             create_table_query = f"""
             CREATE TABLE IF NOT EXISTS {table_name} (
+                unix_time           INTEGER NOT NULL,
                 datetime            TEXT NOT NULL,
                 price_type          TEXT NOT NULL,
                 price_euro_mwh      REAL,
@@ -129,6 +157,7 @@ def load_ree_to_silver(df: pd.DataFrame, table_name: str = "clean_prices") -> bo
                 PRIMARY KEY (datetime, price_type)
             )
             """
+            
             connection.execute(text(create_table_query))
             
             # 2. UPSERT (INSERT OR REPLACE)
@@ -153,8 +182,11 @@ def load_ree_to_silver(df: pd.DataFrame, table_name: str = "clean_prices") -> bo
         return False
 
 
-
-if __name__ == "__main__":
+def transform_energy_prices():
     raw_prices=extract_raw_ree_from_db()
     clean_prices=transform_prices_bronze_to_silver(raw_prices)
     load_ree_to_silver(clean_prices)
+
+
+if __name__ == "__main__":
+    transform_energy_prices()

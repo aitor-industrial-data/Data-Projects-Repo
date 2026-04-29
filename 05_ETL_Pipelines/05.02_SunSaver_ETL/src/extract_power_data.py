@@ -32,7 +32,7 @@ def get_merged_silver_data(table_name_1: str = 'clean_clients', table_name_2: st
             query = f"""
             SELECT c.*,
                 w.unix_time,
-                w.forecast_time,
+                w.forecast_time_utc,
                 w.temp_celsius,          
                 w.humidity_pct,        
                 w.clouds_pct,        
@@ -70,7 +70,7 @@ def transform_pv_generation(df_raw: pd.DataFrame) -> pd.DataFrame:
         
         for index, row in df.iterrows(): 
             # 1. Calcular la posición del sol (altura y dirección) para el instante dado
-            alfa, azimuth  = pvgen.calculate_solar_position(row['latitude'],row['longitude'],row['forecast_time'])
+            alfa, azimuth  = pvgen.calculate_solar_position(row['latitude'],row['longitude'],row['forecast_time_utc'])
 
             # 2. Aplicas el "Candado de Ingeniería": Filtro de elevación mínima
             # Se usa < 2° porque cerca del horizonte los modelos físicos pierden precisión
@@ -87,7 +87,7 @@ def transform_pv_generation(df_raw: pd.DataFrame) -> pd.DataFrame:
                 ghi = pvgen.calculate_ghi(alfa, row['clouds_pct'], row['weather_id'])
                 
                 # 2. Descomponer la GHI en sus vectores Directo (DNI) y Difuso (DHI) mediante el modelo de Erbs
-                dni, dhi = pvgen.decompose_erbs(ghi, alfa, row['forecast_time'])
+                dni, dhi = pvgen.decompose_erbs(ghi, alfa, row['forecast_time_utc'])
                 
                 # 3. Transponer las componentes al plano del panel (POA) considerando ángulo, orientación y albedo
                 poa = pvgen.calculate_total_poa(dni, dhi, ghi, alfa, azimuth, row['angle'], row['aspect'])
@@ -99,12 +99,12 @@ def transform_pv_generation(df_raw: pd.DataFrame) -> pd.DataFrame:
                 p_gen, pr = pvgen.calculate_power_output(poa, t_cell, row['pv_peak_power_kw'], row['loss_pct'])
                 
                 # 6. Simula el consumo dinámico: aplica curvas de carga horarias y el incremento de potencia por refrigeración ante altas temperaturas.
-                p_con = pvgen.calculate_industrial_consumption(row['forecast_time'], row['nominal_load_kw'], row['temp_celsius'])
+                p_con = pvgen.calculate_industrial_consumption(row['forecast_time_utc'], row['nominal_load_kw'], row['temp_celsius'])
             
             entry = {
                 'client_id': row['client_id'],
                 'unix_time': row['unix_time'],
-                'forecast_time': row['forecast_time'],
+                'forecast_time_utc': row['forecast_time_utc'],
                 't_cell_celsius': round(t_cell,3),
                 'poa_wm2': round(poa, 3),
                 'pv_power_gen_kw': round(p_gen, 3),
@@ -144,8 +144,8 @@ def load_generation_to_silver(df: pd.DataFrame, table_name: str = "calculated_ge
         df_sql = df.copy()
         
         # Aseguramos que forecast_time sea string si viene como datetime
-        if pd.api.types.is_datetime64_any_dtype(df_sql['forecast_time']):
-            df_sql['forecast_time'] = df_sql['forecast_time'].dt.strftime('%Y-%m-%d %H:%M:%S')
+        if pd.api.types.is_datetime64_any_dtype(df_sql['forecast_time_utc']):
+            df_sql['forecast_time_utc'] = df_sql['forecast_time_utc'].dt.strftime('%Y-%m-%d %H:%M:%S')
 
         engine = create_engine(f"sqlite:///{db_path}")
 
@@ -155,7 +155,7 @@ def load_generation_to_silver(df: pd.DataFrame, table_name: str = "calculated_ge
             CREATE TABLE IF NOT EXISTS {table_name} (
                 client_id               TEXT NOT NULL,
                 unix_time               INTEGER NOT NULL,
-                forecast_time           TEXT NOT NULL,
+                forecast_time_utc       TEXT NOT NULL,
                 pv_power_gen_kw         REAL,
                 pv_performance_ratio    REAL,
                 poa_wm2                 REAL,
