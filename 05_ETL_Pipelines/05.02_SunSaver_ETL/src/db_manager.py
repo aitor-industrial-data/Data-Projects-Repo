@@ -1,11 +1,8 @@
 import os
-import sqlite3
 import logging
-import pandas as pd
 from pathlib import Path
 from dotenv import load_dotenv
 
-import db_manager
 
 
 logger = logging.getLogger(__name__)
