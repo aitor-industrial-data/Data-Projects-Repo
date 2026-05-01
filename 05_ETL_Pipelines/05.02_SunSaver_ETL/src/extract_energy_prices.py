@@ -25,18 +25,14 @@ def extract_raw_json_from_ree() -> dict:
     """
     Extrae el objeto JSON original de la API de REE.
     """
-    
 
     # Calculamos la fecha de mañana
-    # today=datetime.now().strftime("%Y-%m-%d")
     tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
-    
 
     # Construimos la URL con la fecha de mañana
     url = (
         "https://apidatos.ree.es/es/datos/mercados/precios-mercados-tiempo-real"
         f"?start_date={tomorrow}T00:00&end_date={tomorrow}T23:59&time_trunc=hour"
-        
     )
 
     headers = {"Accept": "application/json"}
@@ -45,10 +41,10 @@ def extract_raw_json_from_ree() -> dict:
         # 1. Petición a la API
         response = requests.get(url, headers=headers, timeout=10)
         response.raise_for_status()
-        
+
         # Este es el diccionario "crudo"
         raw_json = response.json()
-        
+
         if not raw_json.get('included') or not raw_json['included'][0]['attributes']['values']:
             logger.warning("⚠️ Los precios para mañana aún no han sido publicados.")
             return False
@@ -57,9 +53,16 @@ def extract_raw_json_from_ree() -> dict:
         logger.info(f"✅ Extracción completada: {len(raw_json)} registros obtenidos.")
         return raw_json
 
+    except requests.exceptions.HTTPError as e:
+        if response.status_code == 502:
+            logger.warning("⚠️ Precios para mañana aún no publicados (REE devuelve 502 antes de las ~20:30h).")
+        else:
+            logger.error(f"❌ Error HTTP al obtener precios: {e}")
+        return False
+
     except Exception as e:
-        logger.error(f"❌ Error al obtener el JSON crudo: {e}")
-        return None
+        logger.error(f"❌ Error inesperado al obtener el JSON crudo: {e}")
+        return False
 
 
 def ingest_ree_to_bronze(api_response: dict, table_name: str = 'raw_prices') -> bool:
@@ -76,7 +79,7 @@ def ingest_ree_to_bronze(api_response: dict, table_name: str = 'raw_prices') -> 
         # 1. Serializamos el JSON completo a una cadena de texto (Raw String)
         raw_json_str = json.dumps(api_response, ensure_ascii=False)
         ingested_at_utc = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
-        
+
         # 2. Creamos el DataFrame de auditoría
         df = pd.DataFrame([{
             '_ingested_at_utc': ingested_at_utc,
@@ -93,17 +96,19 @@ def ingest_ree_to_bronze(api_response: dict, table_name: str = 'raw_prices') -> 
 
         logger.info(f"✅ Ingesta Bronce REE exitosa en tabla '{table_name}'.")
         return True
-    
+
     except Exception as e:
         logger.error(f"❌ Error en la ingesta Bronce de REE: {e}")
         return False
-    
 
-def extract_energy_prices():
+
+def extract_energy_prices() -> bool:
     raw_prices = extract_raw_json_from_ree()
+    if not raw_prices:
+        return False
     ingest_ree_to_bronze(raw_prices)
+    return True
 
 
 if __name__ == "__main__":
     extract_energy_prices()
-    

@@ -182,10 +182,14 @@ def load_ree_to_silver(df: pd.DataFrame, table_name: str = "clean_prices") -> bo
         return False
 
 
-def transform_energy_prices():
-    raw_prices=extract_raw_ree_from_db()
-    clean_prices=transform_prices_bronze_to_silver(raw_prices)
-    load_ree_to_silver(clean_prices)
+def transform_energy_prices() -> bool:
+    raw_prices = extract_raw_ree_from_db()
+    if raw_prices.empty:
+        return False          
+    clean_prices = transform_prices_bronze_to_silver(raw_prices)
+    if clean_prices.empty:
+        return False         
+    return load_ree_to_silver(clean_prices)
 
 
 if __name__ == "__main__":

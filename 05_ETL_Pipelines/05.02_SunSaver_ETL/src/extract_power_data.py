@@ -110,9 +110,6 @@ def transform_pv_generation(df_raw: pd.DataFrame) -> pd.DataFrame:
                 'pv_power_gen_kw': round(p_gen, 3),
                 'pv_performance_ratio': round(pr, 3),
                 'power_con_kw': round(p_con, 3),
-                'self_consumption_kw':round(min(p_gen, p_con),3),
-                'grid_export_kw':round(max(0, p_gen - p_con),3),
-                'grid_import_kw':round(max(0, p_con - p_gen),3),
                 'calculated_at_utc': datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
                 }
             
@@ -161,9 +158,6 @@ def load_generation_to_silver(df: pd.DataFrame, table_name: str = "clean_calcula
                 poa_wm2                 REAL,
                 t_cell_celsius          REAL,
                 power_con_kw            REAL,
-                self_consumption_kw     REAL,
-                grid_export_kw          REAL,
-                grid_import_kw          REAL,
                 calculated_at_utc       TEXT NOT NULL,
                 PRIMARY KEY (client_id, unix_time)
             )
