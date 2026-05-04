@@ -27,6 +27,7 @@ def extract_raw_json_from_ree() -> dict:
     """
 
     # Calculamos la fecha de mañana
+    today = datetime.now().strftime("%Y-%m-%d") # para hacer pruebas con el precio de hoy (antes de 20:30 no hay precios de mañana)
     tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
 
     # Construimos la URL con la fecha de mañana

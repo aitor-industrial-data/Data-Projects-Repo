@@ -1,10 +1,12 @@
 import pandas as pd
 import sqlite3
+import os
 import json
 import logging
+from datetime import datetime, timezone
 from sqlalchemy import create_engine, text
 
-
+import extract_openweather as ew
 import db_manager
 
 logging.basicConfig(
@@ -15,69 +17,51 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-def extract_raw_weather_from_db(table_name: str = 'raw_weather') -> pd.DataFrame:
+
+def extract_raw_weather_from_json(file_path: str, client_id: str) -> pd.DataFrame:
     """
-    Extrae solo las ultimas lecturas de cada cliente y las devuelve como DataFrame.
+    Lee un archivo JSON físico y lo prepara como el DataFrame 
+    que tu lógica de transformación ya sabe procesar.
     """
     try:
-        db_path = db_manager.get_db_path()
-        
-        # 1. Conexión a la DB (usando str por seguridad de tipos)
-        with sqlite3.connect(str(db_path)) as conn:
-            # 2. Leemos la tabla entera directamente a un DataFrame
-            query = f"""
-            WITH RankedData AS (
-                SELECT 
-                    client_id, 
-                    _ingested_at_utc, 
-                    raw_data,
-                    ROW_NUMBER() OVER (
-                        PARTITION BY client_id 
-                        ORDER BY _ingested_at_utc DESC
-                    ) as rn
-                FROM {table_name}
-            )
-            SELECT client_id, _ingested_at_utc, raw_data
-            FROM RankedData
-            WHERE rn = 1
-            """
-            df = pd.read_sql_query(query, conn)
+        with open(file_path, 'r', encoding='utf-8') as f:
+            raw_data_dict = json.load(f)
             
-        logger.info(f"✅ Extracción exitosa: {len(df)} registros extraidos de DB")
+        # Obtenemos la fecha de creación del archivo para auditoría
+        ingested_at = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+        
+        df = pd.DataFrame([{
+            'client_id': client_id,
+            '_ingested_at_utc': ingested_at,
+            '_source_file': os.path.basename(file_path),
+            'raw_data': json.dumps(raw_data_dict)
+             
+        }])
+        
         return df
-
     except Exception as e:
-        logger.error(f"❌ Error extrayendo de DB: {e}")
-        return pd.DataFrame() # Devolvemos un DF vacío si falla
+        logger.error(f"❌ Error leyendo JSON {file_path}: {e}")
+        return pd.DataFrame()
     
-
+    
+    
 def transform_weather_bronze_to_silver(df_raw: pd.DataFrame) -> pd.DataFrame:
-    """
-    Transforma los datos de weather de cada cliente de la capa Bronze a Silver aplicando
-    limpieza de nulos, tipado de datos y validación de campos críticos.
-    """
     try:
         if df_raw.empty:
             return pd.DataFrame()
         
-        df = df_raw.copy()
-        
-        data_to_clean = []
+        all_clients_data = []
     
-        for index, row in df.iterrows():
+        for index, row in df_raw.iterrows():
             client_id = row['client_id']
             ingested_at_utc = row['_ingested_at_utc']
-
-            # Convertimos el string de nuevo a diccionario
+            source_file = row['_source_file']
             raw_json = json.loads(row['raw_data'])
-            
-            # Extraemos la lista de los 40 pronósticos
             forecasts = raw_json.get('list', [])
             
+            client_forecasts = []
             for f in forecasts:
-                entry = {
-                    'client_id': client_id,
-                    'unix_time':int(f.get('dt')),
+                client_forecasts.append({
                     'forecast_time_utc': f.get('dt_txt'),
                     'temp_celsius': f.get('main', {}).get('temp'),
                     'humidity_pct': f.get('main', {}).get('humidity'),
@@ -87,38 +71,61 @@ def transform_weather_bronze_to_silver(df_raw: pd.DataFrame) -> pd.DataFrame:
                     'weather_id': f.get('weather', [{}])[0].get('id'),
                     'weather_main': f.get('weather', [{}])[0].get('main'),
                     'weather_description': f.get('weather', [{}])[0].get('description'),
-                    'is_daylight': 1 if f.get('sys', {}).get('pod') == 'd' else 0,
-                    '_ingested_at_utc': ingested_at_utc
-                }
-                data_to_clean.append(entry)
+                    'pod': f.get('sys', {}).get('pod')
+                })
+            
+            df_client = pd.DataFrame(client_forecasts)
+            
+            # --- 1. TIPADO (Dentro del bucle para poder operar) ---
+            df_client['forecast_time_utc'] = pd.to_datetime(df_client['forecast_time_utc'])
+            
+            # --- 3. DEDUPLICACIÓN (Si la API enviara duplicados en el mismo JSON) ---
+            df_client = df_client.drop_duplicates(subset=['forecast_time_utc'], keep='last')
+            
+            # --- INTERPOLACIÓN ---
+            df_client.set_index('forecast_time_utc', inplace=True)
+            df_resampled = df_client.resample('1h').asfreq()
+            
+            
+            num_cols = ['temp_celsius', 'humidity_pct', 'clouds_pct', 'rain_prob_norm', 'wind_speed_mps']
+            df_resampled[num_cols] = df_resampled[num_cols].interpolate(method='linear')
+            df_resampled[num_cols] = df_resampled[num_cols].round(3) # redondeo
+            
+            cat_cols = ['weather_id', 'weather_main', 'weather_description', 'pod']
+            df_resampled[cat_cols] = df_resampled[cat_cols].ffill()
+            
+            # --- RECONSTRUCCIÓN ---
+            df_resampled = df_resampled.reset_index()
+            df_resampled['client_id'] = client_id
+            df_resampled['_ingested_at_utc'] = ingested_at_utc
+            df_resampled['_source_file'] = source_file
+            df_resampled['unix_time'] = (df_resampled['forecast_time_utc'] - pd.Timestamp("1970-01-01")) // pd.Timedelta("1s")
+            df_resampled['is_daylight'] = df_resampled['pod'].apply(lambda x: 1 if x == 'd' else 0)
+
+            
+            
+            all_clients_data.append(df_resampled)
                 
-        df = pd.DataFrame(data_to_clean)
+        # Unificamos todos los clientes
+        df_final = pd.concat(all_clients_data, ignore_index=True)
 
-        # ==========================================
-        #          FASE DE LIMPIEZA
-        # ==========================================
-
-        # 1. TIPADO: Convertir a datetime para poder operar con fechas
-        df['forecast_time_utc'] = pd.to_datetime(df['forecast_time_utc'], errors='coerce')
-        df['_ingested_at_utc'] = pd.to_datetime(df['_ingested_at_utc'], errors='coerce')
+        # --- 2. NULOS Y LIMPIEZA FINAL (Fuera del bucle) ---
+        df_final['rain_prob_norm'] = df_final['rain_prob_norm'].fillna(0)
+        df_final['_ingested_at_utc'] = pd.to_datetime(df_final['_ingested_at_utc'], errors='coerce')
         
-        # 2. NULOS: Si no hay probabilidad de lluvia, es 0. 
-        # Si no hay temperatura, llenamos con la anterior (ffill) o 0
-        df['rain_prob_norm'] = df['rain_prob_norm'].fillna(0)
-        df = df.dropna(subset=['client_id', 'forecast_time_utc']) # Campos críticos
-
-        # 3. DEDUPLICACIÓN (Vital en tu caso):
-        # Como has lanzado el robot varias veces, tienes el mismo pronóstico repetido.
-        # Ordenamos por fecha de ingesta y nos quedamos con la última versión de cada pronóstico.
-        df = df.sort_values(by=['client_id', 'forecast_time_utc', '_ingested_at_utc'], ascending=[True, True, False])
-        df = df.drop_duplicates(subset=['client_id', 'forecast_time_utc'], keep='first')
-
-
+        # Eliminar si faltan campos críticos tras la interpolación
+        df_final = df_final.dropna(subset=['client_id', 'forecast_time_utc'])
         
-        logger.info(f"✅ Limpieza Silver completada: {len(df)} registros listos.")
-        return df
+        # ELIMINAR COLUMNAS TEMPORALES
+        if 'pod' in df_final.columns:
+            df_final = df_final.drop(columns=['pod'])
+
+    
+        logger.info(f"✅ Limpieza Silver completada: {len(df_final)} registros listos.")
+        return df_final
         
-    except:
+    except Exception as e:
+        logger.error(f"❌ Error en transformación: {e}")
         return pd.DataFrame()
     
 
@@ -163,6 +170,7 @@ def load_weather_to_silver(df: pd.DataFrame, table_name: str = "clean_weather") 
                 weather_main            TEXT,
                 weather_description     TEXT,
                 is_daylight             INTEGER,
+                _source_file             TEXT,
                 _ingested_at_utc        TEXT NOT NULL,
                 PRIMARY KEY (client_id, unix_time)
             )
@@ -192,25 +200,82 @@ def load_weather_to_silver(df: pd.DataFrame, table_name: str = "clean_weather") 
 
 
 def transform_openweather() -> bool:
+    """
+    Capa Silver: Lee las tareas 'pending' del manifiesto, las transforma 
+    y actualiza su estado a 'success' tras la carga en la DB.
+    """
+    manifest_path = os.path.join("data", "bronze", "process_manifest_openweather.json")
+    
     try:
-        # 1. Extracción (Capa Bronze)
-        raw_weather=extract_raw_weather_from_db()
+        # 1. Verificar si existe el manifiesto
+        if not os.path.exists(manifest_path):
+            logger.info("☕ No existe el manifiesto de control. Nada que procesar.")
+            return True
+
+        # 2. Leer todas las tareas
+        with open(manifest_path, 'r', encoding='utf-8') as f:
+            all_tasks = json.load(f)
+
+        # 3. Filtrar solo las pendientes
+        pending_tasks = [t for t in all_tasks if t['status'] == 'pending']
+
+        if not pending_tasks:
+            logger.info("✅ No hay tareas pendientes en el manifiesto.")
+            return True
+
+        logger.info(f"🚀 Encontradas {len(pending_tasks)} tareas pendientes. Iniciando transformación...")
+
+        # 4. Procesar cada tarea
+        for task in pending_tasks:
+            client_id = task['client_id']
+            path_file = task['path']
+            
+            try:
+                logger.info(f"⚙️ Procesando: {client_id} (Archivo: {os.path.basename(path_file)})")
+
+                # A. Leer el JSON físico
+                df_raw = extract_raw_weather_from_json(path_file, client_id)
+                
+                if df_raw.empty:
+                    logger.warning(f"⚠️ El archivo para {client_id} está vacío o corrupto.")
+                    continue
+
+                # B. Transformación (Limpieza, interpolación e ingeniería de variables)
+                df_silver = transform_weather_bronze_to_silver(df_raw)
+                
+                # C. Carga a DB y actualización de estado
+                if not df_silver.empty:
+                    load_success = load_weather_to_silver(df_silver)
+                    
+                    if load_success:
+                        # Marcamos como éxito en nuestra lista de memoria
+                        task['status'] = 'success'
+                        task['updated_at'] = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+                        logger.info(f"✅ {client_id} cargado en Silver correctamente.")
+                    else:
+                        logger.error(f"❌ Falló la carga en DB para {client_id}.")
+
+            except Exception as e:
+                logger.error(f"❌ Error procesando tarea de {client_id}: {e}")
+                continue # Seguimos con el siguiente cliente aunque uno falle
+
+        # 5. Persistir los cambios de estado en el archivo JSON
+        with open(manifest_path, 'w', encoding='utf-8') as f:
+            json.dump(all_tasks, f, indent=4, ensure_ascii=False)
         
-        # 2. Transformación (Limpieza y tipos)
-        clean_weather=transform_weather_bronze_to_silver(raw_weather)
-        
-        # 3. Carga (Capa Silver)
-        load_weather_to_silver(clean_weather)
-        
+        logger.info("💾 Manifiesto actualizado con los nuevos estados.")
         return True
 
     except Exception as e:
-        # Registramos el error con detalle para debuguear después
-        logger.error(f"❌ Error crítico en el pipeline de transform_clients: {e}")
-        return False
+        logger.error(f"❌ Error crítico en el pipeline de transformación: {e}")
+        return False    
+
+
     
 if __name__ == "__main__":
-
     logger.info(f"Iniciando extraccion e ingesta de weather de capa bronze a silver...")
     transform_openweather()
+
+    
+    
    

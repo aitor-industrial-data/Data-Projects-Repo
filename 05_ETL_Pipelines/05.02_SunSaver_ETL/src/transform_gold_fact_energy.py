@@ -1,8 +1,8 @@
 import sqlite3
 import logging
+from datetime import datetime, timezone
 import db_manager
 
-# Configuración de logging profesional
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -15,50 +15,47 @@ DB_PATH = db_manager.get_db_path()
 
 def build_fact_energy_forecast(conn: sqlite3.Connection) -> None:
     """
-    Genera gold_fact_energy_forecast unificando cálculos, clima y precios.
-    Implementa lógica de agregación para el precio Spot (media horaria).
+    Actualiza la tabla gold_fact_energy_forecast de forma incremental.
+    
+    Ahora clean_prices ya tiene PVPC y Spot a granularidad horaria,
+    por lo que el JOIN es directo en unix_time sin necesidad de agregar.
     """
     try:
-        logger.info("Generando gold_fact_energy_forecast...")
+        logger.info("Iniciando actualización de ventana activa en Gold Layer...")
 
-        # 1. Preparación del esquema
-        conn.execute("DROP TABLE IF EXISTS gold_fact_energy_forecast")
+        # 1. Asegurar esquema
         conn.execute("""
-            CREATE TABLE gold_fact_energy_forecast (
+            CREATE TABLE IF NOT EXISTS gold_fact_energy_forecast (
                 client_id               TEXT    NOT NULL,
-                unix_time               INTEGER NOT NULL,   -- FK → gold_dim_datetime
+                unix_time               INTEGER NOT NULL,
                 forecast_time_utc       TEXT    NOT NULL,
-
-                -- Solar y Consumo
                 pv_power_gen_kw         REAL,
                 pv_performance_ratio    REAL,
                 poa_wm2                 REAL,
                 t_cell_celsius          REAL,
                 power_consumption_kw    REAL,
-
-                -- Meteorología
                 temp_celsius            REAL,
                 humidity_pct            REAL,
                 clouds_pct              REAL,
                 rain_prob_norm          REAL,
                 wind_speed_mps          REAL,
                 weather_id              INTEGER,
-
-                -- Precios (€/MWh)
                 price_pvpc_eur_mwh      REAL,
                 price_spot_eur_mwh      REAL,
-
-                -- Metadatos
                 _loaded_at_utc          TEXT    NOT NULL,
-
-                PRIMARY KEY (client_id, unix_time),
-                FOREIGN KEY (weather_id) REFERENCES gold_dim_weather (weather_id)
+                PRIMARY KEY (client_id, unix_time)
             )
         """)
 
-        # 2. Inserción masiva con JOINs y Agregaciones
-        conn.execute("""
-            INSERT INTO gold_fact_energy_forecast
+        # 2. Ventana de tiempo con margen
+        buffer_seconds = 7200  # 2 horas de margen
+        start_unix = int(datetime.now(timezone.utc).timestamp()) - buffer_seconds
+
+        # 3. UPSERT Incremental
+        # JOIN directo en unix_time: tanto PVPC como Spot ya están a granularidad
+        # horaria en clean_prices tras la transformación Silver.
+        query = f"""
+            INSERT OR REPLACE INTO gold_fact_energy_forecast
             SELECT
                 c.client_id,
                 c.unix_time,
@@ -74,35 +71,35 @@ def build_fact_energy_forecast(conn: sqlite3.Connection) -> None:
                 w.rain_prob_norm,
                 w.wind_speed_mps,
                 w.weather_id,
-                pvpc.price_euro_mwh AS price_pvpc_eur_mwh,
-                spot_avg.price_spot_avg AS price_spot_eur_mwh,
+                pvpc.price_euro_mwh     AS price_pvpc_eur_mwh,
+                spot.price_euro_mwh     AS price_spot_eur_mwh,
                 STRFTIME('%Y-%m-%d %H:%M:%S', 'now') AS _loaded_at_utc
             FROM clean_calculations c
             LEFT JOIN clean_weather w
-                ON w.client_id = c.client_id
+                ON  w.client_id = c.client_id
                 AND w.unix_time = c.unix_time
             LEFT JOIN clean_prices pvpc
-                ON pvpc.unix_time = c.unix_time
+                ON  pvpc.unix_time  = c.unix_time
                 AND pvpc.price_type = 'PVPC'
-            LEFT JOIN (
-                SELECT
-                    unix_time - (unix_time % 3600)  AS hour_unix,
-                    ROUND(AVG(price_euro_mwh), 6)   AS price_spot_avg
-                FROM clean_prices
-                WHERE price_type = 'Precio mercado spot'
-                GROUP BY hour_unix
-            ) spot_avg
-                ON spot_avg.hour_unix = c.unix_time
-        """)
+            LEFT JOIN clean_prices spot
+                ON  spot.unix_time  = c.unix_time
+                AND spot.price_type = 'Precio mercado spot'
+            WHERE c.unix_time >= {start_unix}
+        """
+        
+        cursor = conn.execute(query)
+        rows_affected = cursor.rowcount
 
-        # 3. Creación de Índices para Performance
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_gold_fact_unix_time ON gold_fact_energy_forecast (unix_time)")
+        # 4. Índices
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_gold_fact_unix_time  ON gold_fact_energy_forecast (unix_time)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_gold_fact_weather_id ON gold_fact_energy_forecast (weather_id)")
 
         conn.commit()
         
-        n = conn.execute("SELECT COUNT(*) FROM gold_fact_energy_forecast").fetchone()[0]
-        logger.info(f"✅ gold_fact_energy_forecast generada: {n} filas insertadas")
+        logger.info(
+            f"✅ Gold Layer actualizada: {rows_affected} registros "
+            f"(Unixtime >= {start_unix})"
+        )
 
     except sqlite3.Error as e:
         logger.error(f"❌ Error de base de datos en build_fact_energy_forecast: {e}")

@@ -177,7 +177,7 @@ def run_pipeline(from_stage: int = 1, dry_run: bool = False) -> bool:
 
     # ── Resumen final ─────────────────────────────────────────────────────────
     elapsed_total = time.monotonic() - t_global
-    logger.info("\n" + "=" * 60)
+    logger.info("\n" + "=" * 104)
     logger.info(f"  PIPELINE FINALIZADO en {elapsed_total:.1f}s")
     logger.info(f"  Steps OK: {steps_ok}  |  Steps KO: {steps_ko}")
 

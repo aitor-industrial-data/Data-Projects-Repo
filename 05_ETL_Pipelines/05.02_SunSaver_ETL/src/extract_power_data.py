@@ -1,11 +1,9 @@
 import pandas as pd
-import pvlib
 from datetime import datetime, timezone
 import sqlite3
-import json
 import logging
 from sqlalchemy import create_engine, text
-import numpy as np
+
 
 import db_manager
 import pv_generation_engine as pvgen
@@ -25,6 +23,9 @@ def get_merged_silver_data(table_name_1: str = 'clean_clients', table_name_2: st
     """
     try:
         db_path = db_manager.get_db_path()
+
+        # Obtenemos el timestamp actual en segundos (Unix Time)
+        now_unix = int(datetime.now(timezone.utc).timestamp())
         
         # 1. Conexión a la DB (usando str por seguridad de tipos)
         with sqlite3.connect(str(db_path)) as conn:
@@ -44,10 +45,11 @@ def get_merged_silver_data(table_name_1: str = 'clean_clients', table_name_2: st
                 w.is_daylight             
             FROM {table_name_1} AS c
             INNER JOIN {table_name_2} AS w ON c.client_id = w.client_id
+            WHERE w.unix_time >= {now_unix}
             """
             df = pd.read_sql_query(query, conn)
             
-        logger.info(f"✅ Extracción exitosa: {len(df)} registros extraidos de DB")
+        logger.info(f"✅ Extracción exitosa: {len(df)} registros extraidos de ventana activa de DB")
         return df
 
     except Exception as e:
@@ -63,7 +65,7 @@ def transform_pv_generation(df_raw: pd.DataFrame) -> pd.DataFrame:
     try:
         if df_raw.empty:
             return pd.DataFrame()
-        
+            
         df = df_raw.copy()
         
         data_to_clean = []
@@ -71,7 +73,7 @@ def transform_pv_generation(df_raw: pd.DataFrame) -> pd.DataFrame:
         for index, row in df.iterrows(): 
             # 1. Calcular la posición del sol (altura y dirección) para el instante dado
             alfa, azimuth  = pvgen.calculate_solar_position(row['latitude'],row['longitude'],row['forecast_time_utc'])
-
+            
             # 2. Aplicas el "Candado de Ingeniería": Filtro de elevación mínima
             # Se usa < 2° porque cerca del horizonte los modelos físicos pierden precisión
             if alfa < 2:
@@ -80,6 +82,9 @@ def transform_pv_generation(df_raw: pd.DataFrame) -> pd.DataFrame:
                 dhi = 0.0
                 poa = 0.0
                 p_gen = 0.0
+                pr = 0.0 
+                t_cell = row['temp_celsius']
+                p_con = pvgen.calculate_industrial_consumption(row['forecast_time_utc'], row['nominal_load_kw'], row['temp_celsius'])
             else:
                # Si el sol está lo suficientemente alto para generar energía y cálculos fiables:
                 
@@ -119,7 +124,7 @@ def transform_pv_generation(df_raw: pd.DataFrame) -> pd.DataFrame:
         
         return df
     
-
+    
     except Exception as e:
         logger.error(f"❌ Error en el motor de cálculo PV: {e}")
         return pd.DataFrame()

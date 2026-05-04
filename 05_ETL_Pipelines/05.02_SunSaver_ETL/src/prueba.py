@@ -1,69 +1,94 @@
+import os
+import json
+import stat
+import logging
 import requests
-import pandas as pd
+from dotenv import load_dotenv
+from datetime import datetime, timezone
+from typing import Dict, Any, Optional
 
+# Supongamos que tienes estas utilidades importadas
+# import db_manager 
 
-def extract_weather():
-   
-    url = "https://api.preciodelaluz.org/v1/prices/all?zone=PCB"
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
 
+logger = logging.getLogger(__name__)
+
+load_dotenv()
+
+def extract_weather(lat: float, lon: float) -> Dict[str, Any]:
+    url = "https://api.openweathermap.org/data/2.5/forecast"
+    API_KEY = os.getenv("WEATHER_API_KEY")
     
+    if not API_KEY:
+        logger.error("Falta WEATHER_API_KEY en el .env")
+        return {}
 
-       
-    # Identificarnos ayuda a evitar bloqueos (Rate Limiting)
-    headers = {
-        'User-Agent': 'SunSaver-ETL-Project/1.0 (Contact: tu-email@ejemplo.com)',
-        'Accept': 'application/json'
-        }
-    
+    params = {
+        'lat': lat,
+        'lon': lon,
+        'appid': API_KEY,
+        'units': 'metric',
+        'lang': 'en' 
+    }
+
     try:
-        # Añadimos los headers a la petición
-        response = requests.get(url, headers=headers, timeout=10)
+        response = requests.get(url, params=params, timeout=15)
         response.raise_for_status()
-
         all_data = response.json()
 
         if not all_data:
-            logger.error("OpenWeather devolvió una lista vacía — sin datos para procesar")
-            raise ValueError("OpenWeather devolvió una lista vacía")
+            raise ValueError("OpenWeather devolvió datos vacíos")
 
-        logger.info(f"✅ Extracción completada: {len(all_data)} registros obtenidos.")
         return all_data
-
-    except requests.exceptions.RequestException as e:
-        logger.error(f"❌ Error de conexión con OpenWeather: {e}")
+    except Exception as e:
+        logger.error(f"❌ Error en extracción: {e}")
         raise
 
-def extract_energy_prices():
-    # URL oficial que elegimos
-    url = "https://api.preciodelaluz.org/v1/prices/all?zone=PCB"
-    
-    print(f"🌐 Conectando a la API...")
-    
+
+def ingest_openweather_to_bronze(api_response: dict, client_id: str) -> Optional[str]:
+    """
+    Capa Bronze: Guarda el JSON en un archivo físico, aplica chmod 444
+    y devuelve la ruta del archivo para el rastro de auditoría (Lineage).
+    """
     try:
-        response = requests.get(url, timeout=10)
-        response.raise_for_status()
-        data = response.json()
+        # 1. Definir rutas (Siguiendo tu estructura de carpetas)
+        # Ajustado a tu ruta: ~/Documents/Data-Projects-Repo/
+        bronze_dir = os.path.join("data", "bronze") 
+        os.makedirs(bronze_dir, exist_ok=True)
+
+        timestamp = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')
+        filename = f"weather_{client_id}_{timestamp}.json"
+        full_path = os.path.join(bronze_dir, filename)
+
+        # 2. Guardar el archivo JSON
+        with open(full_path, 'w', encoding='utf-8') as f:
+            json.dump(api_response, f, ensure_ascii=False, indent=4)
+
+        # 3. BLINDAJE: Aplicar chmod 444 (Solo lectura)
+        # Esto evita que nadie (ni el ratón en DBBrowser) lo modifique
+        permisos_lectura = stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH
+        os.chmod(full_path, permisos_lectura)
+
+        logger.info(f"🔒 Capa Bronze protegida: {filename}")
         
-        prices_list = []
-        for hour_range, info in data.items():
-            # Extraemos '00', '01', etc.
-            start_hour = hour_range.split("-")[0]
-            
-            prices_list.append({
-                "hour": start_hour,
-                "price_eur_mwh": float(info['price']),
-                "price_eur_kwh": float(info['price']) / 1000
-            })
-            
-        df = pd.DataFrame(prices_list)
-        print("✅ ¡Datos reales extraídos!")
-        return df
+        # Devolvemos la ruta para que el siguiente script sepa qué leer
+        return full_path
 
     except Exception as e:
-        print(f"❌ Sigue fallando: {e}")
+        logger.error(f"❌ Error guardando Bronze en archivo: {e}")
         return None
+    
 
 if __name__ == "__main__":
-    df_precios = extract_energy_prices()
-    if df_precios is not None:
-        print(df_precios.head())
+    # 1. Extraer de la nube
+    raw_data = extract_weather(42.8, -1.6) # Ejemplo Pamplona
+
+    # 2. Guardar en Bronze y obtener el "puntero" (nombre del archivo)
+    path_weather_raw = ingest_openweather_to_bronze(raw_data, "cliente_001")
+
+    print(path_weather_raw)

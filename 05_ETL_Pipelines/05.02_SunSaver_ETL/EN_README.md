@@ -44,16 +44,16 @@ All of this runs unattended, idempotently, and with structured logging at every 
 ## 🏗️ Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        DATA SOURCES                             │
+┌────────────────────────────────────────────────────────────────┐
+│                        DATA SOURCES                            │
 │  Excel (clients) │  REE API (prices) │  OpenWeather API (wx)   │
 └────────┬─────────┴────────┬──────────┴────────┬────────────────┘
          │                  │                   │
          ▼                  ▼                   ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                    🥉 BRONZE LAYER                              │
-│   raw_clients  │  raw_prices  │  raw_weather                   │
-│   (append-only, full audit trail, _ingested_at_utc)            │
+│   raw_clients  │  raw_prices  │  raw_weather                    │
+│   (append-only, full audit trail, _ingested_at_utc)             │
 └────────────────────────────┬────────────────────────────────────┘
                              │
                              ▼
@@ -63,15 +63,15 @@ All of this runs unattended, idempotently, and with structured logging at every 
 │  (typed, validated, deduplicated, PK-enforced)                  │
 │                        │                                        │
 │          ┌─────────────┘                                        │
-│          ▼                                                       │
-│   ⚡ PV GENERATION ENGINE (pvlib + Haurwitz + Erbs + Faiman)   │
+│          ▼                                                      │
+│   ⚡ PV GENERATION ENGINE (pvlib + Haurwitz + Erbs + Faiman)     │
 └────────────────────────────┬────────────────────────────────────┘
                              │
                              ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                    🥇 GOLD LAYER (Star Schema)                  │
 │  gold_dim_client  │  gold_dim_datetime  │  gold_dim_weather     │
-│                   gold_fact_energy_forecast                      │
+│                   gold_fact_energy_forecast                     │
 │  (BI-ready, FK-enforced, indexed)                               │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -164,7 +164,7 @@ gold_dim_weather
 
 ```bash
 # 1. Clone and install
-git clone https://github.com/your-user/sunsaver-etl.git
+git clone https://github.com/aitor-industrial-data/Data-Projects-Repo/tree/main/05_ETL_Pipelines/05.02_SunSaver_ETL.git
 cd sunsaver-etl
 pip install -r requirements.txt
 

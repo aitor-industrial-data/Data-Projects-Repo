@@ -44,16 +44,16 @@ Todo esto se ejecuta de forma desatendida, idempotente y con logging estructurad
 ## 🏗️ Arquitectura
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                      FUENTES DE DATOS                           │
+┌────────────────────────────────────────────────────────────────┐
+│                      FUENTES DE DATOS                          │
 │  Excel (clientes)  │  API REE (precios)  │  API OpenWeather    │
 └────────┬───────────┴────────┬────────────┴────────┬────────────┘
-         │                    │                      │
-         ▼                    ▼                      ▼
+         │                    │                     │
+         ▼                    ▼                     ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                    🥉 CAPA BRONCE                               │
-│   raw_clients  │  raw_prices  │  raw_weather                   │
-│   (append-only, trazabilidad completa, _ingested_at_utc)       │
+│   raw_clients  │  raw_prices  │  raw_weather                    │
+│   (append-only, trazabilidad completa, _ingested_at_utc)        │
 └────────────────────────────┬────────────────────────────────────┘
                              │
                              ▼
@@ -63,15 +63,15 @@ Todo esto se ejecuta de forma desatendida, idempotente y con logging estructurad
 │  (tipado, validado, deduplicado, PK forzada)                    │
 │                        │                                        │
 │          ┌─────────────┘                                        │
-│          ▼                                                       │
-│   ⚡ MOTOR DE GENERACIÓN FV (pvlib + Haurwitz + Erbs + Faiman) │
+│          ▼                                                      │
+│   ⚡ MOTOR DE GENERACIÓN FV (pvlib + Haurwitz + Erbs + Faiman)   │
 └────────────────────────────┬────────────────────────────────────┘
                              │
                              ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                    🥇 CAPA ORO (Star Schema)                    │
 │  gold_dim_client  │  gold_dim_datetime  │  gold_dim_weather     │
-│                   gold_fact_energy_forecast                      │
+│                   gold_fact_energy_forecast                     │
 │  (listo para BI, FK forzadas, indexado)                         │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -164,7 +164,7 @@ gold_dim_weather
 
 ```bash
 # 1. Clonar e instalar
-git clone https://github.com/tu-usuario/sunsaver-etl.git
+git clone https://github.com/aitor-industrial-data/Data-Projects-Repo/tree/main/05_ETL_Pipelines/05.02_SunSaver_ETL.git
 cd sunsaver-etl
 pip install -r requirements.txt
 
@@ -234,10 +234,5 @@ python orchestrator.py --dry-run
 
 ---
 
-## 📄 Licencia
-
-MIT — ver `LICENSE` para más detalles.
-
----
 
 > *Construido para responsables de energía industrial que están hartos de hojas de cálculo y listos para ingeniería de datos real.*
