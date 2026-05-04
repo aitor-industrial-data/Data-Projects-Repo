@@ -29,5 +29,25 @@ def get_db_path() -> Path:
     return final_path.resolve()
 
 
+def get_bronze_path() -> Path:
+    """
+    Retorna la ruta absoluta del directorio bronce y asegura que el directorio exista.
+    """
+    load_dotenv()
+
+    # __file__ es "<raíz del proyecto>/src/sunsaver.db" -> .parent.parent es '<raíz del proyecto>'
+    # Ajustamos para que BASE_DIR sea la raíz del proyecto
+    BASE_DIR = Path(__file__).resolve().parent.parent
+    
+    _default_bronze = BASE_DIR / "data" / "bronze"
+    _bronze_path_env = os.getenv("BRONZE_PATH")
+
+    final_path = Path(_bronze_path_env) if _bronze_path_env else _default_bronze
+
+    # Aseguramos que la carpeta /data exista
+    final_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    return final_path.resolve()
+
     
 

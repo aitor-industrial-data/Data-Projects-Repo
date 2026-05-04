@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from sqlalchemy import create_engine, text
 
 import extract_openweather as ew
-import db_manager
+import workspace_manager
 
 logging.basicConfig(
     level=logging.INFO,
@@ -20,8 +20,7 @@ logger = logging.getLogger(__name__)
 
 def extract_raw_weather_from_json(file_path: str, client_id: str) -> pd.DataFrame:
     """
-    Lee un archivo JSON físico y lo prepara como el DataFrame 
-    que tu lógica de transformación ya sabe procesar.
+    Lee un archivo JSON físico y lo prepara como el DataFrame.
     """
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
@@ -39,6 +38,7 @@ def extract_raw_weather_from_json(file_path: str, client_id: str) -> pd.DataFram
         }])
         
         return df
+    
     except Exception as e:
         logger.error(f"❌ Error leyendo JSON {file_path}: {e}")
         return pd.DataFrame()
@@ -134,7 +134,7 @@ def load_weather_to_silver(df: pd.DataFrame, table_name: str = "clean_weather") 
     Capa Silver: Almacena el histórico de predicciones/clima procesado.
     Usa una clave primaria compuesta para evitar duplicados exactos.
     """
-    db_path = db_manager.get_db_path()
+    db_path = workspace_manager.get_db_path()
     
     try:
         if df.empty:
@@ -204,7 +204,7 @@ def transform_openweather() -> bool:
     Capa Silver: Lee las tareas 'pending' del manifiesto, las transforma 
     y actualiza su estado a 'success' tras la carga en la DB.
     """
-    manifest_path = os.path.join("data", "bronze", "process_manifest_openweather.json")
+    manifest_path = os.path.join("data", "bronze", "_process_manifest_openweather.json")
     
     try:
         # 1. Verificar si existe el manifiesto

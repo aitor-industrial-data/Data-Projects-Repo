@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional
 
-import db_manager
+import workspace_manager
 
 
 logging.basicConfig(
@@ -30,7 +30,7 @@ def extract_weather(lat: float, lon: float) -> Dict[str, Any]:
         logger.error("Falta WEATHER_API_KEY en el .env")
         return {}
 
-    params = {
+    headers = {
         'lat': lat,
         'lon': lon,
         'appid': API_KEY,
@@ -39,7 +39,7 @@ def extract_weather(lat: float, lon: float) -> Dict[str, Any]:
     }
 
     try:
-        response = requests.get(url, params=params, timeout=15)
+        response = requests.get(url, params=headers, timeout=15)
         response.raise_for_status()
         all_data = response.json()
 
@@ -48,7 +48,7 @@ def extract_weather(lat: float, lon: float) -> Dict[str, Any]:
 
         return all_data
     except Exception as e:
-        logger.error(f"❌ Error en extracción: {e}")
+        logger.error(f"❌ Error en extracción de openweather: {e}")
         raise
 
 
@@ -60,7 +60,7 @@ def ingest_openweather_to_bronze(api_response: dict, client_id: str) -> Optional
     try:
         # 1. Definir rutas (Siguiendo tu estructura de carpetas)
         # Ajustado a tu ruta: ~/Documents/Data-Projects-Repo/
-        bronze_dir = os.path.join("data", "bronze") 
+        bronze_dir=workspace_manager.get_bronze_path()
         os.makedirs(bronze_dir, exist_ok=True)
 
         timestamp = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')
@@ -92,7 +92,7 @@ def extract_openweather(client_table: str = 'clean_clients') -> bool:
     Devuelve True si se generaron nuevas tareas, False en caso contrario.
     """
     try:
-        db_path = db_manager.get_db_path()
+        db_path = workspace_manager.get_db_path()
             
         # 1. LEER CLIENTES
         with sqlite3.connect(str(db_path)) as conn:
@@ -100,7 +100,7 @@ def extract_openweather(client_table: str = 'clean_clients') -> bool:
             df_clients = pd.read_sql(query, conn)
 
         new_extractions = []
-        manifest_path = os.path.join("data", "bronze", "process_manifest_openweather.json")
+        manifest_path = os.path.join("data", "bronze", "_process_manifest_openweather.json")
 
         # 2. BUCLE DE EXTRACCIÓN
         for _, row in df_clients.iterrows():
@@ -115,6 +115,7 @@ def extract_openweather(client_table: str = 'clean_clients') -> bool:
                     path_file = ingest_openweather_to_bronze(raw_weather, client_id)
                     
                     new_extractions.append({
+                        'source': 'openweather',
                         'client_id': client_id,
                         'path': path_file,
                         'status': 'pending',
@@ -142,10 +143,13 @@ def extract_openweather(client_table: str = 'clean_clients') -> bool:
             # Unimos las tareas nuevas a las existentes
             all_tasks.extend(new_extractions)
 
+            pending_count = len([t for t in all_tasks if t['status'] == 'pending'])
+
             with open(manifest_path, 'w', encoding='utf-8') as f:
                 json.dump(all_tasks, f, indent=4, ensure_ascii=False)
             
-            logger.info(f"📄 Manifiesto actualizado: {len(new_extractions)} nuevas tareas pendientes.")
+            logger.info(f"📄 Manifiesto openweather actualizado: {len(new_extractions)} nuevas tareas introducidas.")
+
             return True # Indicamos que hay trabajo nuevo para el Transform
             
         return False # No hubo extracciones nuevas

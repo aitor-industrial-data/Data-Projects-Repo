@@ -4,7 +4,7 @@ import pandas as pd
 from pathlib import Path
 import logging
 from datetime import datetime, timezone
-import db_manager
+import workspace_manager
 
 logging.basicConfig(
     level=logging.INFO,
@@ -56,7 +56,7 @@ def ingest_clients_to_bronze(client_list: list[dict], table_name: str = 'raw_cli
     metadatos de auditoría (_ingested_at_utc).
     """
     try:
-        db_path = db_manager.get_db_path()
+        db_path = workspace_manager.get_db_path()
         
         # 1. Convertimos a DataFrame
         df = pd.DataFrame(client_list)

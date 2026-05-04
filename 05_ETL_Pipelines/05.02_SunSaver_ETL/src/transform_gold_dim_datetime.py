@@ -2,7 +2,7 @@ import sqlite3
 import logging
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
-import db_manager
+import workspace_manager
 
 # Configuración de logging
 logging.basicConfig(
@@ -12,7 +12,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-DB_PATH = db_manager.get_db_path()
+DB_PATH = workspace_manager.get_db_path()
 SPAIN_TZ = ZoneInfo("Europe/Madrid")
 
 FESTIVOS_NACIONALES = {

@@ -1,10 +1,12 @@
 import pandas as pd
+import os
+from datetime import datetime, timezone
 import sqlite3
 import json
 import logging
 from sqlalchemy import create_engine, text
 
-import db_manager
+import workspace_manager
 
 logging.basicConfig(
     level=logging.INFO,
@@ -15,30 +17,30 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def extract_raw_ree_from_db(table_name: str = 'raw_prices') -> pd.DataFrame:
+def extract_raw_ree_from_json(file_path: str) -> pd.DataFrame:
     """
-    Extrae solo la ultima lectura y la devuelve como DataFrame.
+    Lee un archivo JSON físico y lo prepara como el DataFrame.
     """
     try:
-        db_path = db_manager.get_db_path()
-        
-        with sqlite3.connect(str(db_path)) as conn:
-            query = f"""
-                SELECT  
-                    _ingested_at_utc, 
-                    raw_data
-                FROM {table_name}
-                ORDER BY _ingested_at_utc DESC
-                LIMIT 1
-                """
-            df = pd.read_sql_query(query, conn)
+        with open(file_path, 'r', encoding='utf-8') as f:
+            raw_data_dict = json.load(f)
             
-        logger.info(f"✅ Extracción exitosa: {len(df)} registros extraidos de DB")
+        # Obtenemos la fecha de creación del archivo para auditoría
+        ingested_at = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+        
+        df = pd.DataFrame([{
+            '_ingested_at_utc': ingested_at,
+            '_source_file': os.path.basename(file_path),
+            'raw_data': json.dumps(raw_data_dict)
+             
+        }])
+        
         return df
-
+    
     except Exception as e:
-        logger.error(f"❌ Error extrayendo de DB: {e}")
+        logger.error(f"❌ Error leyendo JSON {file_path}: {e}")
         return pd.DataFrame()
+
 
 
 
@@ -57,6 +59,7 @@ def transform_prices_bronze_to_silver(df_raw: pd.DataFrame) -> pd.DataFrame:
         data_to_clean = []
         
         for index, row in df_raw.iterrows():
+            source_file = row['_source_file']
             ingested_at_utc = row['_ingested_at_utc']
             raw_json = json.loads(row['raw_data'])
             series_list = raw_json.get('included', [])
@@ -71,6 +74,7 @@ def transform_prices_bronze_to_silver(df_raw: pd.DataFrame) -> pd.DataFrame:
                         'datetime_utc': v.get('datetime'),
                         'price_euro_mwh': float(v.get('value')),
                         'percentage': v.get('percentage'),
+                        '_source_file': source_file,
                         '_ingested_at_utc': ingested_at_utc
                     }
                     data_to_clean.append(entry)
@@ -103,7 +107,7 @@ def transform_prices_bronze_to_silver(df_raw: pd.DataFrame) -> pd.DataFrame:
             df_spot_raw['hour_utc'] = df_spot_raw['datetime_utc'].dt.floor('h')
             # Cogemos el _ingested_at_utc más reciente de cada grupo
             spot_ingested = (
-                df_spot_raw.groupby('hour_utc')['_ingested_at_utc']
+                df_spot_raw.groupby('hour_utc')[['_ingested_at_utc', '_source_file']]
                 .max()
                 .reset_index()
             )
@@ -150,7 +154,7 @@ def transform_prices_bronze_to_silver(df_raw: pd.DataFrame) -> pd.DataFrame:
     
 
 def load_ree_to_silver(df: pd.DataFrame, table_name: str = "clean_prices") -> bool:
-    db_path = db_manager.get_db_path()
+    db_path = workspace_manager.get_db_path()
     
     try:
         if df.empty:
@@ -163,6 +167,7 @@ def load_ree_to_silver(df: pd.DataFrame, table_name: str = "clean_prices") -> bo
         df_sql['_ingested_at_utc'] = pd.to_datetime(df_sql['_ingested_at_utc'])
         df_sql['datetime_utc'] = df_sql['datetime_utc'].dt.strftime('%Y-%m-%d %H:%M:%S')
         df_sql['_ingested_at_utc'] = df_sql['_ingested_at_utc'].dt.strftime('%Y-%m-%d %H:%M:%S')
+        
 
         engine = create_engine(f"sqlite:///{db_path}")
 
@@ -174,6 +179,7 @@ def load_ree_to_silver(df: pd.DataFrame, table_name: str = "clean_prices") -> bo
                 price_type          TEXT NOT NULL,
                 price_euro_mwh      REAL,
                 percentage          REAL,
+                _source_file        TEXT,
                 _ingested_at_utc    TEXT NOT NULL,
                 PRIMARY KEY (datetime_utc, price_type)
             )
@@ -200,13 +206,76 @@ def load_ree_to_silver(df: pd.DataFrame, table_name: str = "clean_prices") -> bo
 
 
 def transform_energy_prices() -> bool:
-    raw_prices = extract_raw_ree_from_db()
-    if raw_prices.empty:
-        return False          
-    clean_prices = transform_prices_bronze_to_silver(raw_prices)
-    if clean_prices.empty:
-        return False         
-    return load_ree_to_silver(clean_prices)
+    """
+    Capa Silver: Lee las tareas 'pending' del manifiesto de REE,
+    las transforma y actualiza su estado a 'success'.
+    """
+    # 1. Obtener rutas desde el workspace_manager
+    bronze_dir = workspace_manager.get_bronze_path()
+    manifest_path = os.path.join(bronze_dir, "_process_manifest_ree.json")
+    
+    try:
+        # 2. Verificar si existe el manifiesto
+        if not os.path.exists(manifest_path):
+            logger.info("☕ No existe el manifiesto de REE. Nada que procesar.")
+            return True
+
+        # 3. Leer todas las tareas
+        with open(manifest_path, 'r', encoding='utf-8') as f:
+            all_tasks = json.load(f)
+
+        # 4. Filtrar solo las pendientes
+        pending_tasks = [t for t in all_tasks if t['status'] == 'pending']
+
+        if not pending_tasks:
+            logger.info("✅ No hay precios de REE pendientes en el manifiesto.")
+            return True
+
+        logger.info(f"🚀 Encontradas {len(pending_tasks)} tareas de REE pendientes. Iniciando transformación...")
+
+        # 5. Procesar cada tarea (archivo JSON)
+        for task in pending_tasks:
+            path_file = task['path']
+            
+            try:
+                logger.info(f"⚙️ Procesando archivo: {os.path.basename(path_file)}")
+
+                # A. Leer el JSON físico y convertirlo a DataFrame Raw
+                df_raw = extract_raw_ree_from_json(path_file)
+                
+                if df_raw.empty:
+                    logger.warning(f"⚠️ El archivo {os.path.basename(path_file)} está vacío o corrupto.")
+                    continue
+
+                # B. Transformación (Limpieza, tratamiento de Spot/PVPC e interpolación)
+                df_silver = transform_prices_bronze_to_silver(df_raw)
+                
+                # C. Carga a DB y actualización de estado
+                if not df_silver.empty:
+                    load_success = load_ree_to_silver(df_silver)
+                    
+                    if load_success:
+                        # Marcamos como éxito en la lista original
+                        task['status'] = 'success'
+                        task['updated_at'] = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+                        logger.info(f"✅ Archivo {os.path.basename(path_file)} cargado en Silver correctamente.")
+                    else:
+                        logger.error(f"❌ Falló la carga en DB para el archivo {os.path.basename(path_file)}.")
+
+            except Exception as e:
+                logger.error(f"❌ Error procesando tarea de precios: {e}")
+                continue 
+
+        # 6. Persistir los cambios de estado en el archivo JSON
+        with open(manifest_path, 'w', encoding='utf-8') as f:
+            json.dump(all_tasks, f, indent=4, ensure_ascii=False)
+        
+        logger.info("💾 Manifiesto REE actualizado con los nuevos estados.")
+        return True
+
+    except Exception as e:
+        logger.error(f"❌ Error crítico en el pipeline de transformación de REE: {e}")
+        return False
 
 
 if __name__ == "__main__":

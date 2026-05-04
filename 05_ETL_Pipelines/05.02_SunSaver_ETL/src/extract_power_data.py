@@ -5,7 +5,7 @@ import logging
 from sqlalchemy import create_engine, text
 
 
-import db_manager
+import workspace_manager
 import pv_generation_engine as pvgen
 
 logging.basicConfig(
@@ -22,7 +22,7 @@ def get_merged_silver_data(table_name_1: str = 'clean_clients', table_name_2: st
     Extrae solo las ultimas lecturas de cada cliente y las devuelve como DataFrame.
     """
     try:
-        db_path = db_manager.get_db_path()
+        db_path = workspace_manager.get_db_path()
 
         # Obtenemos el timestamp actual en segundos (Unix Time)
         now_unix = int(datetime.now(timezone.utc).timestamp())
@@ -135,7 +135,7 @@ def load_generation_to_silver(df: pd.DataFrame, table_name: str = "clean_calcula
     Almacena los cálculos de rendimiento energético en la DB.
     Usa PK compuesta (client_id, unix_time) para evitar duplicados en el histórico.
     """
-    db_path = db_manager.get_db_path()
+    db_path = workspace_manager.get_db_path()
     
     try:
         if df.empty:

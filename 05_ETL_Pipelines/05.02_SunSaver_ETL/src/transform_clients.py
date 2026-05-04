@@ -4,7 +4,7 @@ import logging
 from sqlalchemy import create_engine, text
 import numpy as np
 
-import db_manager
+import workspace_manager
 
 
 logging.basicConfig(
@@ -21,7 +21,7 @@ def extract_from_db(table_name: str = 'raw_clients') -> pd.DataFrame:
     Lee los datos de la tabla y los devuelve como DataFrame.
     """
     try:
-        db_path = db_manager.get_db_path()
+        db_path = workspace_manager.get_db_path()
         
         # 1. Conexión a la DB (usando str por seguridad de tipos)
         with sqlite3.connect(str(db_path)) as conn:
@@ -145,7 +145,7 @@ def load_df_to_db(df: pd.DataFrame, table_name: str = "clean_clients") -> bool:
     """
     Inyecta un DataFrame en la base de datos SQLite definiendo client_id como PK.
     """
-    db_path = db_manager.get_db_path()
+    db_path = workspace_manager.get_db_path()
     
     try:
         if df.empty:

@@ -1,7 +1,7 @@
 import sqlite3
 import logging
 from datetime import datetime, timezone
-import db_manager
+import workspace_manager
 
 logging.basicConfig(
     level=logging.INFO,
@@ -10,7 +10,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-DB_PATH = db_manager.get_db_path()
+DB_PATH = workspace_manager.get_db_path()
 
 
 def build_fact_energy_forecast(conn: sqlite3.Connection) -> None:

@@ -1,13 +1,16 @@
 import requests
+import stat
 import pandas as pd
 import logging
+import os
 from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 import json
+from typing import Dict, Any, Optional
 import sqlite3
 
 
-import db_manager
+import workspace_manager
 
 logging.basicConfig(
     level=logging.INFO,
@@ -19,7 +22,6 @@ logger = logging.getLogger(__name__)
 
 
 load_dotenv()
-
 
 def extract_raw_json_from_ree() -> dict:
     """
@@ -39,21 +41,17 @@ def extract_raw_json_from_ree() -> dict:
     headers = {"Accept": "application/json"}
 
     try:
-        # 1. Petición a la API
-        response = requests.get(url, headers=headers, timeout=10)
+        response = requests.get(url, params=headers, timeout=15)
         response.raise_for_status()
+        all_data = response.json()
 
-        # Este es el diccionario "crudo"
-        raw_json = response.json()
-
-        if not raw_json.get('included') or not raw_json['included'][0]['attributes']['values']:
+        if not all_data.get('included') or not all_data['included'][0]['attributes']['values']:
             logger.warning("⚠️ Los precios para mañana aún no han sido publicados.")
             return False
-
-        # Devolvemos el diccionario gigante tal cual
-        logger.info(f"✅ Extracción completada: {len(raw_json)} registros obtenidos.")
-        return raw_json
-
+        
+        logger.info(f"✅ Extracción completada: {len(all_data)} registros obtenidos.")
+        return all_data
+    
     except requests.exceptions.HTTPError as e:
         if response.status_code == 502:
             logger.warning("⚠️ Precios para mañana aún no publicados (REE devuelve 502 antes de las ~20:30h).")
@@ -64,51 +62,95 @@ def extract_raw_json_from_ree() -> dict:
     except Exception as e:
         logger.error(f"❌ Error inesperado al obtener el JSON crudo: {e}")
         return False
+    
 
-
-def ingest_ree_to_bronze(api_response: dict, table_name: str = 'raw_prices') -> bool:
+def ingest_ree_to_bronze(api_response: dict) -> Optional[str]:
     """
-    Capa Bronce para REE: Carga el JSON completo de precios en la base de datos.
+    Capa Bronze: Guarda el JSON en un archivo físico, aplica chmod 444
+    y devuelve la ruta del archivo para el rastro de auditoría (Lineage).
     """
-    if not api_response:
-        logger.error("❌ No hay datos de REE para ingestar.")
-        return False
-
     try:
-        db_path = db_manager.get_db_path()
+        # 1. Definir rutas (Siguiendo tu estructura de carpetas)
+        # Ajustado a tu ruta: ~/Documents/Data-Projects-Repo/
+        bronze_dir=workspace_manager.get_bronze_path()
+        os.makedirs(bronze_dir, exist_ok=True)
 
-        # 1. Serializamos el JSON completo a una cadena de texto (Raw String)
-        raw_json_str = json.dumps(api_response, ensure_ascii=False)
-        ingested_at_utc = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+        timestamp = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')
+        filename = f"prices_{timestamp}.json"
+        full_path = os.path.join(bronze_dir, filename)
 
-        # 2. Creamos el DataFrame de auditoría
-        df = pd.DataFrame([{
-            '_ingested_at_utc': ingested_at_utc,
-            'raw_data': raw_json_str
-        }])
+        # 2. Guardar el archivo JSON
+        with open(full_path, 'w', encoding='utf-8') as f:
+            json.dump(api_response, f, ensure_ascii=False, indent=4)
 
-        # 3. Inserción en SQLite
-        with sqlite3.connect(str(db_path)) as conn:
-            df.to_sql(table_name, conn, if_exists='append', index=False)
+        # 3. BLINDAJE: Aplicar chmod 444 (Solo lectura)
+        # Esto evita que nadie (ni el ratón en DBBrowser) lo modifique
+        permisos_lectura = stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH
+        os.chmod(full_path, permisos_lectura)
 
-            # Aseguramos el índice para búsquedas rápidas por fecha de carga
-            index_query = f"CREATE INDEX IF NOT EXISTS idx_ree_ingested_at_utc ON {table_name} (_ingested_at_utc);"
-            conn.execute(index_query)
-
-        logger.info(f"✅ Ingesta Bronce REE exitosa en tabla '{table_name}'.")
-        return True
+        logger.info(f"🔒 Capa Bronze protegida: {filename}")
+        
+        # Devolvemos la ruta para que el siguiente script sepa qué leer
+        return full_path
 
     except Exception as e:
-        logger.error(f"❌ Error en la ingesta Bronce de REE: {e}")
-        return False
+        logger.error(f"❌ Error guardando Bronze en archivo: {e}")
+        return None
+
+
 
 
 def extract_energy_prices() -> bool:
-    raw_prices = extract_raw_json_from_ree()
-    if not raw_prices:
+    """
+    Orquestador: Extrae de REE, guarda en Bronze y actualiza el manifiesto.
+    """
+    try:
+        # 1. Extracción
+        raw_prices = extract_raw_json_from_ree()
+        if not raw_prices:
+            return False
+
+        # 2. Ingesta a Bronze
+        path_file = ingest_ree_to_bronze(raw_prices)
+        if not path_file:
+            return False
+
+        # Creamos la lista de "nuevas extracciones" 
+        new_extractions = [{
+            'source': 'REE',
+            'path': path_file,
+            'status': 'pending',
+            'created_at': datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S'),
+            'updated_at': datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+        }]
+
+        # 3. Gestión del MANIFIESTO
+        bronze_dir = workspace_manager.get_bronze_path()
+        manifest_path = os.path.join(bronze_dir, "_process_manifest_ree.json")
+
+        all_tasks = []
+        if os.path.exists(manifest_path):
+            try:
+                with open(manifest_path, 'r', encoding='utf-8') as f:
+                    all_tasks = json.load(f)
+            except Exception:
+                all_tasks = []
+
+        # Unimos las nuevas a las existentes
+        all_tasks.extend(new_extractions)
+
+        # 4. Guardar archivo
+        with open(manifest_path, 'w', encoding='utf-8') as f:
+            json.dump(all_tasks, f, indent=4, ensure_ascii=False)
+        
+        # EL LOGGER QUE HAS PEDIDO:
+        logger.info(f"📄 Manifiesto REE actualizado: {len(new_extractions)} nuevas tareas introducidas.")
+        
+        return True
+
+    except Exception as e:
+        logger.critical(f"❌ Error crítico en extract_energy_prices: {e}")
         return False
-    ingest_ree_to_bronze(raw_prices)
-    return True
 
 
 if __name__ == "__main__":
