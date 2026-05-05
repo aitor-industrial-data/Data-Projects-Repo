@@ -1,6 +1,9 @@
 
-import sqlite3
+import os
+import json
+import stat
 import pandas as pd
+from typing import Optional
 from pathlib import Path
 import logging
 from datetime import datetime, timezone
@@ -37,6 +40,10 @@ def extract_clients_from_excel() -> list[dict]:
             logger.warning(f"⚠️ El archivo {excel_path.name} está vacío.")
             return []
 
+        # Convertimos los NaN de excel a None para que el JSON sea válido (escribirá 'null')
+        # Usamos .where y pd.notnull para no alterar tipos de datos válidos
+        df = df.astype(object).where(pd.notnull(df), None)
+        
         logger.info(f"✅ Extracción exitosa: {len(df)} clientes detectados.")
         return df.to_dict(orient='records')
 
@@ -50,40 +57,92 @@ def extract_clients_from_excel() -> list[dict]:
 
 
 
-def ingest_clients_to_bronze(client_list: list[dict], table_name: str = 'raw_clients') -> bool:
+def ingest_clients_to_bronze(api_response: list[dict]) -> Optional[str]:
     """
     Capa Bronce: Carga los datos crudos del Excel y añade 
     metadatos de auditoría (_ingested_at_utc).
     """
     try:
-        db_path = workspace_manager.get_db_path()
-        
-        # 1. Convertimos a DataFrame
-        df = pd.DataFrame(client_list)
+        bronze_dir=workspace_manager.get_bronze_path()
+        os.makedirs(bronze_dir, exist_ok=True)
 
-        # 2. Añadimos el metadato de auditoría (Estándar de ingeniería)
-        # Usamos el guion bajo para indicar que es un campo de control
-        df['_ingested_at_utc'] = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
-        
+        timestamp = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')
+        filename = f"clients_{timestamp}.json"
+        full_path = os.path.join(bronze_dir, filename)
 
-        # 3. Volcado a SQLite
-        with sqlite3.connect(str(db_path)) as conn:
-            # Usamos 'replace' para asegurar que la estructura de la tabla 
-            # coincida siempre con el Excel + nuestra columna de auditoría
-            df.to_sql(table_name, conn, if_exists='append', index=False)
-            
-        logger.info(f"✅ Ingesta exitosa: {len(df)} registros añadidos a base de datos")
-        return True
-    
+        # 2. Guardar el archivo JSON
+        with open(full_path, 'w', encoding='utf-8') as f:
+            json.dump(api_response, f, ensure_ascii=False, indent=4)
+
+        # 3. BLINDAJE: Aplicar chmod 444 (Solo lectura)
+        # Esto evita que nadie lo modifique
+        permisos_lectura = stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH
+        os.chmod(full_path, permisos_lectura)
+
+        logger.info(f"🔒 Capa Bronze protegida: {filename}")
+        
+        # Devolvemos la ruta para que el siguiente script sepa qué leer
+        return full_path
+
     except Exception as e:
-        logger.error(f"❌ Error en la ingesta Bronce: {e}")
+        logger.error(f"❌ Error guardando Bronze en archivo: {e}")
+        return None
+        
+
+
+def extract_clients() -> bool:
+    """
+    Orquestador: Extrae de .xlsx, guarda en Bronze y actualiza el manifiesto.
+    """
+    try:
+        # 1. Extracción
+        raw_clients = extract_clients_from_excel()
+        if not raw_clients:
+            return False
+
+        # 2. Ingesta a Bronze
+        path_file = ingest_clients_to_bronze(raw_clients)
+        if not path_file:
+            return False
+
+        # Creamos la lista de "nuevas extracciones" 
+        new_extractions = [{
+            'source': 'clients_source.xlsx',
+            'path': path_file,
+            'status': 'pending',
+            'created_at': datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S'),
+            'updated_at': datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+        }]
+
+        # 3. Gestión del MANIFIESTO
+        bronze_dir = workspace_manager.get_bronze_path()
+        manifest_path = os.path.join(bronze_dir, "_process_manifest_clients.json")
+
+        all_tasks = []
+        if os.path.exists(manifest_path):
+            try:
+                with open(manifest_path, 'r', encoding='utf-8') as f:
+                    all_tasks = json.load(f)
+            except Exception:
+                all_tasks = []
+
+        # Unimos las nuevas a las existentes
+        all_tasks.extend(new_extractions)
+
+        # 4. Guardar archivo
+        with open(manifest_path, 'w', encoding='utf-8') as f:
+            json.dump(all_tasks, f, indent=4, ensure_ascii=False)
+        
+        # EL LOGGER QUE HAS PEDIDO:
+        logger.info(f"📄 Manifiesto REE actualizado: {len(new_extractions)} nuevas tareas introducidas.")
+        
+        return True
+
+    except Exception as e:
+        logger.critical(f"❌ Error crítico en extract_energy_prices: {e}")
         return False
 
 
-def extract_clients () -> bool:
-    #extrae e inyecta clientes en capa bronce de db
-    clients=extract_clients_from_excel()
-    ingest_clients_to_bronze(clients)
 
 
 if __name__ == "__main__":

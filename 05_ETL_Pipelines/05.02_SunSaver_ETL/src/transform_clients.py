@@ -1,8 +1,10 @@
 import pandas as pd
-import sqlite3
+import os
+import json
 import logging
 from sqlalchemy import create_engine, text
 import numpy as np
+from datetime import datetime, timezone
 
 import workspace_manager
 
@@ -16,25 +18,22 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
     
 
-def extract_from_db(table_name: str = 'raw_clients') -> pd.DataFrame:
-    """
-    Lee los datos de la tabla y los devuelve como DataFrame.
-    """
+def extract_clients_from_json(file_path: str) -> pd.DataFrame:
     try:
-        db_path = workspace_manager.get_db_path()
-        
-        # 1. Conexión a la DB (usando str por seguridad de tipos)
-        with sqlite3.connect(str(db_path)) as conn:
-            # 2. Leemos la tabla entera directamente a un DataFrame
-            query = f"SELECT * FROM {table_name}"
-            df = pd.read_sql_query(query, conn)
+        with open(file_path, 'r', encoding='utf-8') as f:
+            raw_data_list = json.load(f) 
             
-        logger.info(f"✅ Extracción exitosa: {len(df)} registros extraidos de DB")
+        ingested_at = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+        
+        df = pd.DataFrame(raw_data_list)
+        
+        df['_ingested_at_utc'] = ingested_at
+        df['_source_file'] = os.path.basename(file_path)
+        
         return df
-
     except Exception as e:
-        logger.error(f"❌ Error extrayendo de DB: {e}")
-        return pd.DataFrame() # Devolvemos un DF vacío si falla
+        logger.error(f"❌ Error leyendo JSON {file_path}: {e}")
+        return pd.DataFrame()
     
 
 def transform_clients_bronze_to_silver(df_raw: pd.DataFrame) -> pd.DataFrame:
@@ -70,7 +69,6 @@ def transform_clients_bronze_to_silver(df_raw: pd.DataFrame) -> pd.DataFrame:
         df['_ingested_at_utc'] = pd.to_datetime(df['_ingested_at_utc'], errors='coerce')
 
         # 4. Borrar líneas si los campos CRÍTICOS son nulos
-        # client_id, name, latitude, longitude, peak_power_kw
         critical_fields = ['client_id', 'name', 'latitude', 'longitude', 'pv_peak_power_kw', '_ingested_at_utc']
         df = df.dropna(subset=critical_fields)
         
@@ -88,19 +86,21 @@ def transform_clients_bronze_to_silver(df_raw: pd.DataFrame) -> pd.DataFrame:
         # Validar coordenadas ( Lat -90 a 90, Lon -180 a 180)
         df = df[df['latitude'].between(-90, 90) & df['longitude'].between(-180, 180)]
 
-        # Validar angle (0 a 90 grados) y aspect (0 a 360 grados)
-        df.loc[~df['angle'].between(0, 90), 'angle'] = 30.0  # Valor por defecto
-        df.loc[~df['aspect'].between(0, 360), 'aspect'] = 180.0 # Orientación Sur
+        # Validar angle (0 a 90 grados) y aspect (1 a 360 grados)
+        # FIX BUG 3: aspect=0 es Norte (inusual) → se excluye el 0 usando between(1, 360)
+        df.loc[~df['angle'].between(0, 90), 'angle'] = 30.0       # Valor por defecto
+        df.loc[~df['aspect'].between(1, 360), 'aspect'] = 180.0   # Orientación Sur (era between(0,360) → 0 pasaba)
 
         # Validar en porcentaje (0 a 100)
         df.loc[~df['loss_pct'].between(0, 90), 'loss_pct'] = 14.0  
         df.loc[~df['soc_min_pct'].between(0, 90), 'soc_min_pct'] = 20.0
 
-        # Validar valores decimales (0 a 1)
-        df.loc[~df['efficiency'].between(0, 1), 'efficiency'] = 0.15
+        # FIX BUG 1: Validar efficiency (0 a 1) — valores como 2, 21 se corrigen a 0.15
+        # El .loc reemplaza inválidos por el default ANTES del fillna, así que NaN queda para fillna
+        df.loc[df['efficiency'].notna() & ~df['efficiency'].between(0, 1), 'efficiency'] = 0.15
 
         # Evitar valores negativos o absurdos
-        df = df[df['pv_peak_power_kw'] > 0] # Borra potencia negativa
+        df = df[df['pv_peak_power_kw'] > 0]
         df.loc[df['panel_area_m2'] < 0, 'panel_area_m2'] = 0
         df.loc[df['battery_capacity_kwh'] < 0, 'battery_capacity_kwh'] = 0
         df.loc[df['installation_cost_eur'] < 0, 'installation_cost_eur'] = 0
@@ -108,25 +108,23 @@ def transform_clients_bronze_to_silver(df_raw: pd.DataFrame) -> pd.DataFrame:
         # ==========================================================
 
         # 6. Gestión de duplicados: nos quedamos con el más reciente
-        # Ordenamos por fecha de ingesta (reciente primero) y quitamos duplicados por ID
         df = df.sort_values(by='_ingested_at_utc', ascending=False)
         df = df.drop_duplicates(subset=['client_id'], keep='first')
-        # Acortamos la fecha a formato legible (YYYY-MM-DD HH:MM:SS)
         df['_ingested_at_utc'] = df['_ingested_at_utc'].dt.strftime('%Y-%m-%d %H:%M:%S')
 
         # 7. Rellenar el resto de nulos con valores coherentes
         fill_values = {
             'description': 'unknown',
-            'nominal_load_kw': df['pv_peak_power_kw']*1.3, # Sobredimensionamiento del 30% para compensar pérdidas térmicas (derating) y maximizar carga de baterías.
+            'nominal_load_kw': df['pv_peak_power_kw'] * 1.3,
             'panel_area_m2': 0.0,
-            'efficiency': 0.15,       # Valor estándar de eficiencia (15%)
+            'efficiency': 0.15,
             'panel_type': 'unknown',
-            'loss_pct': 14.0,         # Pérdida estándar habitual
-            'angle': 30.0,            # Inclinación común
-            'aspect': 180.0,          # Orientación Sur (habitual en instalaciones)
+            'loss_pct': 14.0,
+            'angle': 30.0,
+            'aspect': 180.0,
             'mounting': 'unknown',
             'battery_capacity_kwh': 0.0,
-            'soc_min_pct': 20.0,      # Límite de descarga seguro común
+            'soc_min_pct': 20.0,
             'installation_cost_eur': 0.0,
             'timezone': 'UTC'
         }
@@ -141,7 +139,7 @@ def transform_clients_bronze_to_silver(df_raw: pd.DataFrame) -> pd.DataFrame:
 
 
     
-def load_df_to_db(df: pd.DataFrame, table_name: str = "clean_clients") -> bool:
+def load_clients_to_silver(df: pd.DataFrame, table_name: str = "clean_clients") -> bool:
     """
     Inyecta un DataFrame en la base de datos SQLite definiendo client_id como PK.
     """
@@ -155,11 +153,8 @@ def load_df_to_db(df: pd.DataFrame, table_name: str = "clean_clients") -> bool:
         engine = create_engine(f"sqlite:///{db_path}")
 
         with engine.begin() as connection:
-            # 1. Si queremos 'replace', eliminamos la tabla existente
             connection.execute(text(f"DROP TABLE IF EXISTS {table_name}"))
 
-            # 2. Definimos el esquema manualmente para asegurar la Primary Key
-            # Ajusta los tipos de datos según tus necesidades técnicas
             create_table_query = f"""
             CREATE TABLE IF NOT EXISTS {table_name} (
                     client_id               TEXT NOT NULL PRIMARY KEY,
@@ -180,12 +175,12 @@ def load_df_to_db(df: pd.DataFrame, table_name: str = "clean_clients") -> bool:
                     soc_min_pct             REAL NOT NULL,
                     installation_cost_eur   REAL NOT NULL,
                     timezone                TEXT NOT NULL,
+                    _source_file            TEXT NOT NULL,
                     _ingested_at_utc        TEXT NOT NULL
                 )
             """
             connection.execute(text(create_table_query))
             
-            # 3. Inyectamos los datos. Usamos if_exists='append' porque la tabla ya existe
             df.to_sql(table_name, con=connection, if_exists='append', index=False)
         
         logger.info(f"✅ Ingesta exitosa: '{table_name}' (PK: client_id) con {len(df)} registros.")
@@ -197,30 +192,106 @@ def load_df_to_db(df: pd.DataFrame, table_name: str = "clean_clients") -> bool:
 
 
 def transform_clients() -> bool:
+    """
+    Capa Silver: Lee las tareas 'pending' Y 'error' del manifiesto, las transforma
+    y actualiza su estado a 'success' o 'error' tras la carga en la DB.
+    Las tareas con 'error' se reintentan automaticamente en cada ejecucion.
+    """
+    bronze_dir = workspace_manager.get_bronze_path()
+    manifest_path = os.path.join(bronze_dir, "_process_manifest_clients.json")
+    
     try:
-        # 1. Extracción (Capa Bronze)
-        raw_clients = extract_from_db()
-        
-        # 2. Transformación (Limpieza y tipos)
-        clean_clients = transform_clients_bronze_to_silver(raw_clients)
-        
-        # 3. Carga (Capa Silver)
-        load_df_to_db(clean_clients)
-        
-        return True
+        if not os.path.exists(manifest_path):
+            logger.info("No existe el manifiesto de control. Nada que procesar.")
+            return True
+
+        with open(manifest_path, 'r', encoding='utf-8') as f:
+            all_tasks = json.load(f)
+
+        # Procesar tareas pendientes Y las que fallaron anteriormente (reintento)
+        actionable_tasks = [t for t in all_tasks if t['status'] in ('pending', 'error')]
+
+        if not actionable_tasks:
+            logger.info("✅ No hay tareas pendientes en el manifiesto.")
+            return True
+
+        pending_count = sum(1 for t in actionable_tasks if t['status'] == 'pending')
+        retry_count   = sum(1 for t in actionable_tasks if t['status'] == 'error')
+        logger.info(f"🚀 {pending_count} tareas nuevas + {retry_count} reintentos. Iniciando transformacion...")
+
+        # Contadores de la sesion actual (no historicos)
+        session_ok    = 0
+        session_error = 0
+
+        for task in actionable_tasks:
+            path_file = task['path']
+            
+            try:
+                logger.info(f"Procesando archivo: {os.path.basename(path_file)}")
+
+                df_raw = extract_clients_from_json(path_file)
+                
+                if df_raw.empty:
+                    logger.warning(f"⚠️ El archivo {os.path.basename(path_file)} esta vacio o corrupto.")
+                    task['status'] = 'error'
+                    task['error'] = 'Archivo vacio o corrupto'
+                    task['updated_at'] = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+                    session_error += 1
+                    continue
+
+                df_silver = transform_clients_bronze_to_silver(df_raw)
+                
+                if not df_silver.empty:
+                    load_success = load_clients_to_silver(df_silver)
+                    
+                    if load_success:
+                        task['status'] = 'success'
+                        task.pop('error', None)  # Limpiar error previo si el reintento tuvo exito
+                        task['updated_at'] = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+                        logger.info(f"✅ Archivo {os.path.basename(path_file)} cargado en Silver correctamente.")
+                        session_ok += 1
+                    else:
+                        task['status'] = 'error'
+                        task['error'] = 'Fallo la carga en DB'
+                        task['updated_at'] = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+                        logger.error(f"❌ Fallo la carga en DB para el archivo {os.path.basename(path_file)}.")
+                        session_error += 1
+                else:
+                    task['status'] = 'error'
+                    task['error'] = 'DataFrame vacio tras transformacion Silver'
+                    task['updated_at'] = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+                    logger.error(f"❌ Transformacion devolvio DataFrame vacio para {os.path.basename(path_file)}.")
+                    session_error += 1
+
+            except Exception as e:
+                logger.error(f"❌ Error procesando tarea {os.path.basename(path_file)}: {e}")
+                task['status'] = 'error'
+                task['error'] = str(e)
+                task['updated_at'] = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+                session_error += 1
+                continue 
+
+        # Persistir cambios en el manifiesto
+        with open(manifest_path, 'w', encoding='utf-8') as f:
+            json.dump(all_tasks, f, indent=4, ensure_ascii=False)
+
+        # Resumen de sesion actual + estado global del manifiesto
+        total_ok      = sum(1 for t in all_tasks if t['status'] == 'success')
+        total_error   = sum(1 for t in all_tasks if t['status'] == 'error')
+        total_pending = sum(1 for t in all_tasks if t['status'] == 'pending')
+        logger.info(
+            f"💾 Sesión: ✅ {session_ok} ok | ❌ {session_error} errores  —  "
+            f"Manifiesto total: ✅ {total_ok} | ❌ {total_error} | ⏳ {total_pending}"
+        )
+
+        return session_error == 0
 
     except Exception as e:
-        # Registramos el error con detalle para debuguear después
-        logger.error(f"❌ Error crítico en el pipeline de transform_clients: {e}")
+        logger.error(f"❌ Error critico en el pipeline de transformacion de clients: {e}")
         return False
-    
+
 
 
 if __name__ == "__main__":
-
-    logger.info(f"Iniciando extraccion e ingesta de clientes de capa bronze a silver...")
+    logger.info("Iniciando extraccion e ingesta de clientes de capa bronze a silver...")
     transform_clients()
-    
-
-    
-        

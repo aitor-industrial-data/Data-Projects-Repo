@@ -207,72 +207,105 @@ def load_ree_to_silver(df: pd.DataFrame, table_name: str = "clean_prices") -> bo
 
 def transform_energy_prices() -> bool:
     """
-    Capa Silver: Lee las tareas 'pending' del manifiesto de REE,
-    las transforma y actualiza su estado a 'success'.
+    Capa Silver: Lee las tareas 'pending' Y 'error' del manifiesto de REE,
+    las transforma y actualiza su estado a 'success' o 'error'.
+    Las tareas con 'error' se reintentan automáticamente en cada ejecución.
     """
-    # 1. Obtener rutas desde el workspace_manager
     bronze_dir = workspace_manager.get_bronze_path()
     manifest_path = os.path.join(bronze_dir, "_process_manifest_ree.json")
-    
+ 
     try:
-        # 2. Verificar si existe el manifiesto
+        # 1. Verificar si existe el manifiesto
         if not os.path.exists(manifest_path):
             logger.info("☕ No existe el manifiesto de REE. Nada que procesar.")
             return True
-
-        # 3. Leer todas las tareas
+ 
+        # 2. Leer todas las tareas
         with open(manifest_path, 'r', encoding='utf-8') as f:
             all_tasks = json.load(f)
-
-        # 4. Filtrar solo las pendientes
-        pending_tasks = [t for t in all_tasks if t['status'] == 'pending']
-
-        if not pending_tasks:
+ 
+        # 3. Filtrar pendientes Y errores anteriores (reintento automático)
+        actionable_tasks = [t for t in all_tasks if t['status'] in ('pending', 'error')]
+ 
+        if not actionable_tasks:
             logger.info("✅ No hay precios de REE pendientes en el manifiesto.")
             return True
-
-        logger.info(f"🚀 Encontradas {len(pending_tasks)} tareas de REE pendientes. Iniciando transformación...")
-
-        # 5. Procesar cada tarea (archivo JSON)
-        for task in pending_tasks:
+ 
+        pending_count = sum(1 for t in actionable_tasks if t['status'] == 'pending')
+        retry_count   = sum(1 for t in actionable_tasks if t['status'] == 'error')
+        logger.info(f"🚀 {pending_count} tareas nuevas + {retry_count} reintentos REE. Iniciando transformación...")
+ 
+        # Contadores de la sesión actual (no históricos)
+        session_ok    = 0
+        session_error = 0
+ 
+        # 4. Procesar cada tarea (archivo JSON)
+        for task in actionable_tasks:
             path_file = task['path']
-            
+ 
             try:
                 logger.info(f"⚙️ Procesando archivo: {os.path.basename(path_file)}")
-
+ 
                 # A. Leer el JSON físico y convertirlo a DataFrame Raw
                 df_raw = extract_raw_ree_from_json(path_file)
-                
+ 
                 if df_raw.empty:
                     logger.warning(f"⚠️ El archivo {os.path.basename(path_file)} está vacío o corrupto.")
+                    task['status'] = 'error'
+                    task['error'] = 'Archivo vacío o corrupto'
+                    task['updated_at'] = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+                    session_error += 1
                     continue
-
+ 
                 # B. Transformación (Limpieza, tratamiento de Spot/PVPC e interpolación)
                 df_silver = transform_prices_bronze_to_silver(df_raw)
-                
+ 
                 # C. Carga a DB y actualización de estado
                 if not df_silver.empty:
                     load_success = load_ree_to_silver(df_silver)
-                    
+ 
                     if load_success:
-                        # Marcamos como éxito en la lista original
                         task['status'] = 'success'
+                        task.pop('error', None)  # Limpiar error previo si el reintento tuvo éxito
                         task['updated_at'] = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
                         logger.info(f"✅ Archivo {os.path.basename(path_file)} cargado en Silver correctamente.")
+                        session_ok += 1
                     else:
+                        task['status'] = 'error'
+                        task['error'] = 'Falló la carga en DB'
+                        task['updated_at'] = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
                         logger.error(f"❌ Falló la carga en DB para el archivo {os.path.basename(path_file)}.")
-
+                        session_error += 1
+                else:
+                    task['status'] = 'error'
+                    task['error'] = 'DataFrame vacío tras transformación Silver'
+                    task['updated_at'] = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+                    logger.error(f"❌ Transformación devolvió DataFrame vacío para {os.path.basename(path_file)}.")
+                    session_error += 1
+ 
             except Exception as e:
                 logger.error(f"❌ Error procesando tarea de precios: {e}")
-                continue 
-
-        # 6. Persistir los cambios de estado en el archivo JSON
+                task['status'] = 'error'
+                task['error'] = str(e)
+                task['updated_at'] = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+                session_error += 1
+                continue
+ 
+        # 5. Persistir los cambios de estado en el archivo JSON
         with open(manifest_path, 'w', encoding='utf-8') as f:
             json.dump(all_tasks, f, indent=4, ensure_ascii=False)
-        
-        logger.info("💾 Manifiesto REE actualizado con los nuevos estados.")
-        return True
-
+ 
+        # Resumen de sesión actual + estado global del manifiesto
+        total_ok      = sum(1 for t in all_tasks if t['status'] == 'success')
+        total_error   = sum(1 for t in all_tasks if t['status'] == 'error')
+        total_pending = sum(1 for t in all_tasks if t['status'] == 'pending')
+        logger.info(
+            f"💾 Sesión: ✅ {session_ok} ok | ❌ {session_error} errores  —  "
+            f"Manifiesto total: ✅ {total_ok} | ❌ {total_error} | ⏳ {total_pending}"
+        )
+ 
+        return session_error == 0
+ 
     except Exception as e:
         logger.error(f"❌ Error crítico en el pipeline de transformación de REE: {e}")
         return False

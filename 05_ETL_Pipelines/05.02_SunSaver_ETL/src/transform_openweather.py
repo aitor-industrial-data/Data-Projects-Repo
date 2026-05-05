@@ -1,12 +1,11 @@
 import pandas as pd
-import sqlite3
 import os
 import json
 import logging
 from datetime import datetime, timezone
 from sqlalchemy import create_engine, text
 
-import extract_openweather as ew
+
 import workspace_manager
 
 logging.basicConfig(
@@ -201,45 +200,57 @@ def load_weather_to_silver(df: pd.DataFrame, table_name: str = "clean_weather") 
 
 def transform_openweather() -> bool:
     """
-    Capa Silver: Lee las tareas 'pending' del manifiesto, las transforma 
-    y actualiza su estado a 'success' tras la carga en la DB.
+    Capa Silver: Lee las tareas 'pending' Y 'error' del manifiesto, las transforma
+    y actualiza su estado a 'success' o 'error' tras la carga en la DB.
+    Las tareas con 'error' se reintentan automáticamente en cada ejecución.
     """
-    manifest_path = os.path.join("data", "bronze", "_process_manifest_openweather.json")
+    bronze_dir = workspace_manager.get_bronze_path()
+    manifest_path = os.path.join(bronze_dir, "_process_manifest_openweather.json")
     
     try:
         # 1. Verificar si existe el manifiesto
         if not os.path.exists(manifest_path):
             logger.info("☕ No existe el manifiesto de control. Nada que procesar.")
             return True
-
+ 
         # 2. Leer todas las tareas
         with open(manifest_path, 'r', encoding='utf-8') as f:
             all_tasks = json.load(f)
-
-        # 3. Filtrar solo las pendientes
-        pending_tasks = [t for t in all_tasks if t['status'] == 'pending']
-
-        if not pending_tasks:
+ 
+        # 3. Filtrar pendientes Y errores anteriores (reintento automático)
+        actionable_tasks = [t for t in all_tasks if t['status'] in ('pending', 'error')]
+ 
+        if not actionable_tasks:
             logger.info("✅ No hay tareas pendientes en el manifiesto.")
             return True
-
-        logger.info(f"🚀 Encontradas {len(pending_tasks)} tareas pendientes. Iniciando transformación...")
-
+ 
+        pending_count = sum(1 for t in actionable_tasks if t['status'] == 'pending')
+        retry_count   = sum(1 for t in actionable_tasks if t['status'] == 'error')
+        logger.info(f"🚀 {pending_count} tareas nuevas + {retry_count} reintentos. Iniciando transformación...")
+ 
+        # Contadores de la sesión actual (no históricos)
+        session_ok    = 0
+        session_error = 0
+ 
         # 4. Procesar cada tarea
-        for task in pending_tasks:
+        for task in actionable_tasks:
             client_id = task['client_id']
             path_file = task['path']
             
             try:
                 logger.info(f"⚙️ Procesando: {client_id} (Archivo: {os.path.basename(path_file)})")
-
+ 
                 # A. Leer el JSON físico
                 df_raw = extract_raw_weather_from_json(path_file, client_id)
                 
                 if df_raw.empty:
                     logger.warning(f"⚠️ El archivo para {client_id} está vacío o corrupto.")
+                    task['status'] = 'error'
+                    task['error'] = 'Archivo vacío o corrupto'
+                    task['updated_at'] = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+                    session_error += 1
                     continue
-
+ 
                 # B. Transformación (Limpieza, interpolación e ingeniería de variables)
                 df_silver = transform_weather_bronze_to_silver(df_raw)
                 
@@ -248,28 +259,50 @@ def transform_openweather() -> bool:
                     load_success = load_weather_to_silver(df_silver)
                     
                     if load_success:
-                        # Marcamos como éxito en nuestra lista de memoria
                         task['status'] = 'success'
+                        task.pop('error', None)  # Limpiar error previo si el reintento tuvo éxito
                         task['updated_at'] = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
                         logger.info(f"✅ {client_id} cargado en Silver correctamente.")
+                        session_ok += 1
                     else:
+                        task['status'] = 'error'
+                        task['error'] = 'Falló la carga en DB'
+                        task['updated_at'] = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
                         logger.error(f"❌ Falló la carga en DB para {client_id}.")
-
+                        session_error += 1
+                else:
+                    task['status'] = 'error'
+                    task['error'] = 'DataFrame vacío tras transformación Silver'
+                    task['updated_at'] = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+                    logger.error(f"❌ Transformación devolvió DataFrame vacío para {client_id}.")
+                    session_error += 1
+ 
             except Exception as e:
                 logger.error(f"❌ Error procesando tarea de {client_id}: {e}")
-                continue # Seguimos con el siguiente cliente aunque uno falle
-
+                task['status'] = 'error'
+                task['error'] = str(e)
+                task['updated_at'] = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+                session_error += 1
+                continue
+ 
         # 5. Persistir los cambios de estado en el archivo JSON
         with open(manifest_path, 'w', encoding='utf-8') as f:
             json.dump(all_tasks, f, indent=4, ensure_ascii=False)
-        
-        logger.info("💾 Manifiesto actualizado con los nuevos estados.")
-        return True
-
+ 
+        # Resumen de sesión actual + estado global del manifiesto
+        total_ok      = sum(1 for t in all_tasks if t['status'] == 'success')
+        total_error   = sum(1 for t in all_tasks if t['status'] == 'error')
+        total_pending = sum(1 for t in all_tasks if t['status'] == 'pending')
+        logger.info(
+            f"💾 Sesión: ✅ {session_ok} ok | ❌ {session_error} errores  —  "
+            f"Manifiesto total: ✅ {total_ok} | ❌ {total_error} | ⏳ {total_pending}"
+        )
+ 
+        return session_error == 0
+ 
     except Exception as e:
         logger.error(f"❌ Error crítico en el pipeline de transformación: {e}")
-        return False    
-
+        return False
 
     
 if __name__ == "__main__":
