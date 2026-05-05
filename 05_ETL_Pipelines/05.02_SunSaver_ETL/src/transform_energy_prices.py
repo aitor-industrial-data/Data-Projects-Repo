@@ -25,14 +25,12 @@ def extract_raw_ree_from_json(file_path: str) -> pd.DataFrame:
         with open(file_path, 'r', encoding='utf-8') as f:
             raw_data_dict = json.load(f)
             
-        # Obtenemos la fecha de creación del archivo para auditoría
         ingested_at = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
         
         df = pd.DataFrame([{
             '_ingested_at_utc': ingested_at,
             '_source_file': os.path.basename(file_path),
             'raw_data': json.dumps(raw_data_dict)
-             
         }])
         
         return df
@@ -42,14 +40,10 @@ def extract_raw_ree_from_json(file_path: str) -> pd.DataFrame:
         return pd.DataFrame()
 
 
-
-
 def transform_prices_bronze_to_silver(df_raw: pd.DataFrame) -> pd.DataFrame:
     """
-    Transforma los datos de precios de REE de la capa Bronze a Silver.
-    - PVPC: ya viene por hora de la API → se carga tal cual.
-    - Spot: viene cada 15 min → se agrupa a la hora (media) para alinearse
-      con el resto de capas (weather por hora, PVPC por hora).
+    Transforma los datos de precios PVPC de REE de la capa Bronze a Silver.
+    El PVPC ya viene por hora de la API, se limpia y carga directamente.
     """
     try:
         if df_raw.empty:
@@ -73,7 +67,6 @@ def transform_prices_bronze_to_silver(df_raw: pd.DataFrame) -> pd.DataFrame:
                         'price_type': price_type,
                         'datetime_utc': v.get('datetime'),
                         'price_euro_mwh': float(v.get('value')),
-                        'percentage': v.get('percentage'),
                         '_source_file': source_file,
                         '_ingested_at_utc': ingested_at_utc
                     }
@@ -94,49 +87,17 @@ def transform_prices_bronze_to_silver(df_raw: pd.DataFrame) -> pd.DataFrame:
                 logger.warning(f"🚨 Se detectaron {len(outliers)} valores fuera de rango. Filtrando...")
                 df = df[(df['price_euro_mwh'] >= lower_limit) & (df['price_euro_mwh'] <= upper_limit)]
 
-            # 3. Separar PVPC y Spot para tratarlos de forma independiente
-            df_pvpc = df[df['price_type'] != 'Precio mercado spot'].copy()
-            df_spot_raw = df[df['price_type'] == 'Precio mercado spot'].copy()
+            # 3. PVPC: ya viene por hora, solo deduplicar
+            df = df.sort_values('_ingested_at_utc', ascending=False)
+            df = df.drop_duplicates(subset=['price_type', 'datetime_utc'], keep='first')
 
-            # --- PVPC: ya viene por hora, solo deduplicar ---
-            df_pvpc = df_pvpc.sort_values('_ingested_at_utc', ascending=False)
-            df_pvpc = df_pvpc.drop_duplicates(subset=['price_type', 'datetime_utc'], keep='first')
-
-            # --- SPOT: agrupar a la hora (media de los 4 cuartos de hora) ---
-            # Truncamos al inicio de la hora para hacer el groupby
-            df_spot_raw['hour_utc'] = df_spot_raw['datetime_utc'].dt.floor('h')
-            # Cogemos el _ingested_at_utc más reciente de cada grupo
-            spot_ingested = (
-                df_spot_raw.groupby('hour_utc')[['_ingested_at_utc', '_source_file']]
-                .max()
-                .reset_index()
-            )
-            spot_avg = (
-                df_spot_raw.groupby('hour_utc')['price_euro_mwh']
-                .mean()
-                .round(4)
-                .reset_index()
-            )
-            df_spot = spot_avg.merge(spot_ingested, on='hour_utc')
-            df_spot.rename(columns={'hour_utc': 'datetime_utc'}, inplace=True)
-            df_spot['price_type'] = 'Precio mercado spot'
-            df_spot['percentage'] = None  # la media por hora pierde el % individual
-
-            logger.info(
-                f"📊 Spot agrupado a hora: {len(df_spot_raw)} registros de 15 min "
-                f"→ {len(df_spot)} registros horarios"
-            )
-
-            # 4. Reunificar ambas series
-            df = pd.concat([df_pvpc, df_spot], ignore_index=True)
-
-            # 5. Rellenar nulos con interpolación por serie
+            # 4. Rellenar nulos con interpolación
             df = df.sort_values(['price_type', 'datetime_utc']).reset_index(drop=True)
             df['price_euro_mwh'] = df.groupby('price_type')['price_euro_mwh'].transform(
                 lambda x: x.interpolate(method='linear').ffill().bfill().round(4)
             )
 
-            # 6. Columna unix_time (inicio de hora, alineado con weather y fact)
+            # 5. Columna unix_time (inicio de hora, alineado con weather y fact)
             df['unix_time'] = (
                 df['datetime_utc']
                 .dt.tz_localize(None)
@@ -167,7 +128,6 @@ def load_ree_to_silver(df: pd.DataFrame, table_name: str = "clean_prices") -> bo
         df_sql['_ingested_at_utc'] = pd.to_datetime(df_sql['_ingested_at_utc'])
         df_sql['datetime_utc'] = df_sql['datetime_utc'].dt.strftime('%Y-%m-%d %H:%M:%S')
         df_sql['_ingested_at_utc'] = df_sql['_ingested_at_utc'].dt.strftime('%Y-%m-%d %H:%M:%S')
-        
 
         engine = create_engine(f"sqlite:///{db_path}")
 
@@ -178,7 +138,6 @@ def load_ree_to_silver(df: pd.DataFrame, table_name: str = "clean_prices") -> bo
                 datetime_utc        TEXT NOT NULL,
                 price_type          TEXT NOT NULL,
                 price_euro_mwh      REAL,
-                percentage          REAL,
                 _source_file        TEXT,
                 _ingested_at_utc    TEXT NOT NULL,
                 PRIMARY KEY (datetime_utc, price_type)
@@ -235,7 +194,6 @@ def transform_energy_prices() -> bool:
         retry_count   = sum(1 for t in actionable_tasks if t['status'] == 'error')
         logger.info(f"🚀 {pending_count} tareas nuevas + {retry_count} reintentos REE. Iniciando transformación...")
  
-        # Contadores de la sesión actual (no históricos)
         session_ok    = 0
         session_error = 0
  
@@ -246,7 +204,6 @@ def transform_energy_prices() -> bool:
             try:
                 logger.info(f"⚙️ Procesando archivo: {os.path.basename(path_file)}")
  
-                # A. Leer el JSON físico y convertirlo a DataFrame Raw
                 df_raw = extract_raw_ree_from_json(path_file)
  
                 if df_raw.empty:
@@ -257,16 +214,14 @@ def transform_energy_prices() -> bool:
                     session_error += 1
                     continue
  
-                # B. Transformación (Limpieza, tratamiento de Spot/PVPC e interpolación)
                 df_silver = transform_prices_bronze_to_silver(df_raw)
  
-                # C. Carga a DB y actualización de estado
                 if not df_silver.empty:
                     load_success = load_ree_to_silver(df_silver)
  
                     if load_success:
                         task['status'] = 'success'
-                        task.pop('error', None)  # Limpiar error previo si el reintento tuvo éxito
+                        task.pop('error', None)
                         task['updated_at'] = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
                         logger.info(f"✅ Archivo {os.path.basename(path_file)} cargado en Silver correctamente.")
                         session_ok += 1
@@ -295,7 +250,6 @@ def transform_energy_prices() -> bool:
         with open(manifest_path, 'w', encoding='utf-8') as f:
             json.dump(all_tasks, f, indent=4, ensure_ascii=False)
  
-        # Resumen de sesión actual + estado global del manifiesto
         total_ok      = sum(1 for t in all_tasks if t['status'] == 'success')
         total_error   = sum(1 for t in all_tasks if t['status'] == 'error')
         total_pending = sum(1 for t in all_tasks if t['status'] == 'pending')

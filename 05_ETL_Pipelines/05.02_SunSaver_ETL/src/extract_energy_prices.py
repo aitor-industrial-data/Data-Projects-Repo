@@ -28,10 +28,10 @@ def extract_raw_json_from_ree() -> dict:
     Ejecutar después de las 20:30h.
     """
 
-    now = datetime.now()
+    """now = datetime.now()
     if now.hour < 20 or (now.hour == 20 and now.minute < 30):
         logger.warning(f"⚠️  Son las {now.strftime('%H:%M')}. Los precios de mañana se publican después de las 20:30h.")
-        return False
+        return False"""
     
     today = datetime.now().strftime("%Y-%m-%d")
     tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
@@ -70,7 +70,7 @@ def extract_raw_json_from_ree() -> dict:
     except requests.exceptions.HTTPError as e:
         code=response.status_code
         if code in (500,502):
-            logger.error(f"⚠️ REE devuelve {code}. Precios para mañana aún no publicados (~20:30h).")
+            logger.error(f"⚠️  REE devuelve {code}. Precios para mañana aún no publicados (SPOT ~14:00, PVP ~20:30h).")
         else:
             logger.error(f"❌ Error HTTP: {e}")
         return False
@@ -78,6 +78,7 @@ def extract_raw_json_from_ree() -> dict:
     except Exception as e:
         logger.error(f"❌ Error inesperado: {e}")
         return False
+    
 
 
 def ingest_ree_to_bronze(api_response: dict) -> Optional[str]:

@@ -16,9 +16,7 @@ DB_PATH = workspace_manager.get_db_path()
 def build_fact_energy_forecast(conn: sqlite3.Connection) -> None:
     """
     Actualiza la tabla gold_fact_energy_forecast de forma incremental.
-    
-    Ahora clean_prices ya tiene PVPC y Spot a granularidad horaria,
-    por lo que el JOIN es directo en unix_time sin necesidad de agregar.
+    JOIN directo en unix_time con PVPC horario de clean_prices.
     """
     try:
         logger.info("Iniciando actualización de ventana activa en Gold Layer...")
@@ -41,7 +39,6 @@ def build_fact_energy_forecast(conn: sqlite3.Connection) -> None:
                 wind_speed_mps          REAL,
                 weather_id              INTEGER,
                 price_pvpc_eur_mwh      REAL,
-                price_spot_eur_mwh      REAL,
                 _loaded_at_utc          TEXT    NOT NULL,
                 PRIMARY KEY (client_id, unix_time)
             )
@@ -52,8 +49,6 @@ def build_fact_energy_forecast(conn: sqlite3.Connection) -> None:
         start_unix = int(datetime.now(timezone.utc).timestamp()) - buffer_seconds
 
         # 3. UPSERT Incremental
-        # JOIN directo en unix_time: tanto PVPC como Spot ya están a granularidad
-        # horaria en clean_prices tras la transformación Silver.
         query = f"""
             INSERT OR REPLACE INTO gold_fact_energy_forecast
             SELECT
@@ -72,7 +67,6 @@ def build_fact_energy_forecast(conn: sqlite3.Connection) -> None:
                 w.wind_speed_mps,
                 w.weather_id,
                 pvpc.price_euro_mwh     AS price_pvpc_eur_mwh,
-                spot.price_euro_mwh     AS price_spot_eur_mwh,
                 STRFTIME('%Y-%m-%d %H:%M:%S', 'now') AS _loaded_at_utc
             FROM clean_calculations c
             LEFT JOIN clean_weather w
@@ -81,9 +75,6 @@ def build_fact_energy_forecast(conn: sqlite3.Connection) -> None:
             LEFT JOIN clean_prices pvpc
                 ON  pvpc.unix_time  = c.unix_time
                 AND pvpc.price_type = 'PVPC'
-            LEFT JOIN clean_prices spot
-                ON  spot.unix_time  = c.unix_time
-                AND spot.price_type = 'Precio mercado spot'
             WHERE c.unix_time >= {start_unix}
         """
         
