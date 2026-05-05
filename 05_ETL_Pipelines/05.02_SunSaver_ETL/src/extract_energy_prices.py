@@ -1,16 +1,14 @@
 import requests
 import stat
-import pandas as pd
 import logging
 import os
 from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 import json
-from typing import Dict, Any, Optional
-import sqlite3
-
+from typing import Optional
 
 import workspace_manager
+
 
 logging.basicConfig(
     level=logging.INFO,
@@ -23,46 +21,64 @@ logger = logging.getLogger(__name__)
 
 load_dotenv()
 
+
 def extract_raw_json_from_ree() -> dict:
     """
-    Extrae el objeto JSON original de la API de REE.
+    Extrae precios PVPC (id=1001) de mañana. 
+    Ejecutar después de las 20:30h.
     """
 
-    # Calculamos la fecha de mañana
-    today = datetime.now().strftime("%Y-%m-%d") # para hacer pruebas con el precio de hoy (antes de 20:30 no hay precios de mañana)
+    now = datetime.now()
+    if now.hour < 20 or (now.hour == 20 and now.minute < 30):
+        logger.warning(f"⚠️  Son las {now.strftime('%H:%M')}. Los precios de mañana se publican después de las 20:30h.")
+        return False
+    
+    today = datetime.now().strftime("%Y-%m-%d")
     tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
 
-    # Construimos la URL con la fecha de mañana
-    url = (
-        "https://apidatos.ree.es/es/datos/mercados/precios-mercados-tiempo-real"
-        f"?start_date={tomorrow}T00:00&end_date={tomorrow}T23:59&time_trunc=hour"
-    )
-
-    headers = {"Accept": "application/json"}
-
     try:
-        response = requests.get(url, params=headers, timeout=15)
+        url = (
+            "https://apidatos.ree.es/es/datos/mercados/precios-mercados-tiempo-real"
+            f"?start_date={tomorrow}T00:00&end_date={tomorrow}T23:59"
+            "&time_trunc=hour&geo_trunc=electric_system"
+            "&geo_limit=peninsular&geo_ids=8741"
+        )
+        headers = {
+            "Accept": "application/json",
+            "Origin": "https://www.ree.es",
+            "Referer": "https://www.ree.es/",
+        }
+        response = requests.get(url, headers=headers, timeout=15)
         response.raise_for_status()
         all_data = response.json()
 
-        if not all_data.get('included') or not all_data['included'][0]['attributes']['values']:
-            logger.warning("⚠️ Los precios para mañana aún no han sido publicados.")
-            return False
-        
-        logger.info(f"✅ Extracción completada: {len(all_data)} registros obtenidos.")
-        return all_data
-    
+        pvpc_item = next(
+            (item for item in all_data.get("included", [])
+             if item.get("id") == "1001"),
+            None
+        )
+
+        if pvpc_item and pvpc_item["attributes"].get("values"):
+            logger.info(f"✅ PVPC (id=1001) extraído correctamente para {tomorrow}")
+            all_data["included"] = [pvpc_item]
+            return all_data
+
+        # Si llega aquí es que REE respondió pero sin datos — raro a esta hora
+        logger.error("❌ REE respondió pero sin datos PVPC. ¿Se ha ejecutado antes de las 20:30?")
+        return False
+
     except requests.exceptions.HTTPError as e:
-        if response.status_code == 502:
-            logger.warning("⚠️ Precios para mañana aún no publicados (REE devuelve 502 antes de las ~20:30h).")
+        code=response.status_code
+        if code in (500,502):
+            logger.error(f"⚠️ REE devuelve {code}. Precios para mañana aún no publicados (~20:30h).")
         else:
-            logger.error(f"❌ Error HTTP al obtener precios: {e}")
+            logger.error(f"❌ Error HTTP: {e}")
         return False
 
     except Exception as e:
-        logger.error(f"❌ Error inesperado al obtener el JSON crudo: {e}")
+        logger.error(f"❌ Error inesperado: {e}")
         return False
-    
+
 
 def ingest_ree_to_bronze(api_response: dict) -> Optional[str]:
     """
@@ -84,7 +100,7 @@ def ingest_ree_to_bronze(api_response: dict) -> Optional[str]:
             json.dump(api_response, f, ensure_ascii=False, indent=4)
 
         # 3. BLINDAJE: Aplicar chmod 444 (Solo lectura)
-        # Esto evita que nadie (ni el ratón en DBBrowser) lo modifique
+        # Esto evita que nadie lo modifique
         permisos_lectura = stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH
         os.chmod(full_path, permisos_lectura)
 
