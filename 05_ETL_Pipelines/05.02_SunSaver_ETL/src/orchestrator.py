@@ -183,7 +183,7 @@ def run_pipeline(from_stage: int = 1, dry_run: bool = False) -> bool:
 
     if steps_ko > 0:
         logger.warning(
-            f"  ⚠️  {steps_ko} step(s) fallaron pero el pipeline continuó. "
+            f"⚠️  {steps_ko} step(s) fallaron pero el pipeline continuó. "
             f"Revisa los logs anteriores."
         )
     else:
