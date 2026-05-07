@@ -35,12 +35,12 @@ Uso:
 
 import sys
 import time
-import logging
 import argparse
 from datetime import datetime, timezone
 from typing import Callable
 
 # ── Módulos del proyecto ─────────────────────────────────────────────────────
+from logger_config import setup_logging
 import extract_clients
 import extract_energy_prices
 import transform_clients
@@ -54,13 +54,8 @@ import transform_gold_dim_weather
 import transform_gold_fact_energy
 
 # ── Logging ───────────────────────────────────────────────────────────────────
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
-logger = logging.getLogger("orchestrator")
 
+logger = setup_logging()
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Definición del pipeline
@@ -102,7 +97,7 @@ def run_step(name: str, fn: Callable, dry_run: bool = False) -> bool:
     Devuelve True si tuvo éxito, False si falló.
     """
     if dry_run:
-        logger.info(f"  [DRY-RUN] {name}")
+        logger.info(f" [DRY-RUN] {name}")
         return True
 
     logger.info(f"  ▶  {name} ...")
@@ -132,6 +127,7 @@ def run_pipeline(from_stage: int = 1, dry_run: bool = False) -> bool:
     Si algún stage falla completamente (todos sus steps fallan), aborta.
     """
     started_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    logger.info("\n")
     logger.info("=" * 60)
     logger.info(f"  PIPELINE SUNSAVER — inicio: {started_at}")
     if from_stage > 1:

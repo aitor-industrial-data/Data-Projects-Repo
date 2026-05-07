@@ -1,20 +1,14 @@
 import pandas as pd
 import os
 from datetime import datetime, timezone
-import sqlite3
 import json
-import logging
 from sqlalchemy import create_engine, text
 
 import workspace_manager
+from logger_config import setup_logging
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
-)
 
-logger = logging.getLogger(__name__)
+logger = setup_logging()
 
 
 def extract_raw_ree_from_json(file_path: str) -> pd.DataFrame:

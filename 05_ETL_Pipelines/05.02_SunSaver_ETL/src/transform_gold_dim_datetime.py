@@ -1,16 +1,11 @@
 import sqlite3
-import logging
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 import workspace_manager
+from logger_config import setup_logging
 
-# Configuración de logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
-logger = logging.getLogger(__name__)
+
+logger = setup_logging()
 
 DB_PATH = workspace_manager.get_db_path()
 SPAIN_TZ = ZoneInfo("Europe/Madrid")

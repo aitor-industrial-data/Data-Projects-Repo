@@ -1,7 +1,6 @@
 import os
 import json
 import stat
-import logging
 import sqlite3
 import requests
 import pandas as pd
@@ -10,15 +9,10 @@ from datetime import datetime, timezone
 from typing import Dict, Any, Optional
 
 import workspace_manager
+from logger_config import setup_logging
 
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
-)
-
-logger = logging.getLogger(__name__)
+logger = setup_logging()
 
 load_dotenv()
 

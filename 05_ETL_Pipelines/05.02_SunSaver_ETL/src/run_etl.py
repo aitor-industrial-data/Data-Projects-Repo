@@ -1,4 +1,4 @@
-import logging
+
 import extract_clients as ec
 import transform_clients as tc
 import extract_openweather as ew
@@ -10,17 +10,10 @@ import transform_gold_dim_clients as gc
 import transform_gold_dim_datetime as gd
 import transform_gold_dim_weather as gw
 import transform_gold_fact_energy as ge
+from logger_config import setup_logging
 
 
-
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
-)
-
-logger = logging.getLogger(__name__)
+logger = setup_logging()
 
 
 
