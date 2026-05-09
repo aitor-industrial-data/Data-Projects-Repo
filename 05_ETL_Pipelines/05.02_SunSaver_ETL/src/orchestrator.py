@@ -41,6 +41,7 @@ from typing import Callable
 
 # ── Módulos del proyecto ─────────────────────────────────────────────────────
 from logger_config import setup_logging
+from metadata_manager import save_etl_metadata
 import extract_clients
 import extract_energy_prices
 import transform_clients
@@ -124,70 +125,94 @@ def run_step(name: str, fn: Callable, dry_run: bool = False) -> bool:
 def run_pipeline(from_stage: int = 1, dry_run: bool = False) -> bool:
     """
     Ejecuta el pipeline completo desde `from_stage`.
-    Si algún stage falla completamente (todos sus steps fallan), aborta.
+    Si algún stage falla completamente, aborta y registra el error.
     """
+
+    # --- INICIO DE MÉTRICAS ---
+    t_global_start = time.monotonic() 
     started_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-    logger.info("\n")
+    pipeline_status = "SUCCESS"
+    error_detail = None  # <--- Para capturar el mensaje de error
+    total_rows_affected = 0 # <--- Para sumar el volumen de datos
+    # --------------------------
+
+    logger.info("\n"+ "*" * 120)
     logger.info("=" * 60)
     logger.info(f"  PIPELINE SUNSAVER — inicio: {started_at}")
+    
     if from_stage > 1:
         logger.info(f"  Arrancando desde stage {from_stage}")
     if dry_run:
         logger.info("  MODO DRY-RUN: no se ejecuta nada")
     logger.info("=" * 60)
 
-    t_global = time.monotonic()
     steps_ok = 0
     steps_ko = 0
     current_stage = None
-
-    # Agrupamos por stage para poder detectar si un stage entero falla
     stage_results: dict[int, list[bool]] = {}
 
-    for stage_num, name, fn in PIPELINE:
-        # Saltar stages anteriores al punto de entrada
-        if stage_num < from_stage:
-            continue
+    try:
+        for stage_num, name, fn in PIPELINE:
+            if stage_num < from_stage:
+                continue
 
-        # Cabecera de stage nuevo
-        if stage_num != current_stage:
-            current_stage = stage_num
-            logger.info(f"\n── STAGE {stage_num} {'─'*40}")
+            if stage_num != current_stage:
+                current_stage = stage_num
+                logger.info(f"\n── STAGE {stage_num} {'─'*40}")
 
-        ok = run_step(name, fn, dry_run=dry_run)
+            # Ejecutamos el paso
+            ok = run_step(name, fn, dry_run=dry_run)
 
-        stage_results.setdefault(stage_num, []).append(ok)
-        if ok:
-            steps_ok += 1
-        else:
-            steps_ko += 1
+            stage_results.setdefault(stage_num, []).append(ok)
+            
+            if ok:
+                steps_ok += 1
+                # Si tus funciones devuelven el número de filas, aquí podrías sumarlas
+                # total_rows_affected += (el_retorno_de_fn)
+            else:
+                steps_ko += 1
+                # Capturamos el nombre del primer step que falla como error descriptivo
+                if error_detail is None:
+                    error_detail = f"Fallo en step: {name}"
 
-        # Si algún stage crítico falla por completo, abortamos
-        # (todos los steps del stage han devuelto False)
-        if not any(stage_results[stage_num]):
-            logger.critical(
-                f"\n💥 Stage {stage_num} ha fallado completamente. "
-                f"Abortando pipeline para evitar datos corruptos en stages posteriores."
-            )
-            return False
+            # Verificación de fallo total del stage
+            if not any(stage_results[stage_num]):
+                pipeline_status = f"FAILED AT STAGE {stage_num}"
+                error_detail = f"Stage {stage_num} abortado completamente tras fallo en {name}"
+                logger.critical(f"\n💥 {error_detail}")
+                return False
 
-    # ── Resumen final ─────────────────────────────────────────────────────────
-    elapsed_total = time.monotonic() - t_global
-    logger.info("\n" + "=" * 104)
-    logger.info(f"  PIPELINE FINALIZADO en {elapsed_total:.1f}s")
-    logger.info(f"  Steps OK: {steps_ok}  |  Steps KO: {steps_ko}")
+    except Exception as e:
+        pipeline_status = "CRITICAL ERROR"
+        error_detail = str(e) # Captura excepciones no controladas del sistema
+        logger.error(f"Error inesperado en el orquestador: {e}")
+        raise e
 
-    if steps_ko > 0:
-        logger.warning(
-            f"⚠️  {steps_ko} step(s) fallaron pero el pipeline continuó. "
-            f"Revisa los logs anteriores."
-        )
-    else:
-        logger.info("  ✅ Todos los steps completados correctamente.")
+    finally:
+        # --- FINALIZACIÓN Y GUARDADO DE METADATOS ---
+        elapsed_total = time.monotonic() - t_global_start
+        
+        if steps_ko > 0 and "FAILED" not in pipeline_status:
+            pipeline_status = "PARTIAL SUCCESS"
 
-    logger.info("=" * 60)
+        if not dry_run:
+            try:
+                # Ahora pasamos status, duration, rows y el error capturado
+                save_etl_metadata(
+                    status=pipeline_status, 
+                    duration=elapsed_total,
+                    rows=steps_ok, # Por ahora usamos steps exitosos como volumen
+                    error=error_detail
+                )
+                logger.info(f"[METADATA] Ejecución registrada en base de datos. Status: {pipeline_status}")
+            except Exception as meta_err:
+                logger.error(f"[METADATA] Error al guardar auditoría: {meta_err}")
+
+        logger.info("\n" + "=" * 104)
+        logger.info(f"  PIPELINE FINALIZADO en {elapsed_total:.1f}s")
+        logger.info(f"  Steps OK: {steps_ok}  |  Steps KO: {steps_ko}")
+
     return steps_ko == 0
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CLI

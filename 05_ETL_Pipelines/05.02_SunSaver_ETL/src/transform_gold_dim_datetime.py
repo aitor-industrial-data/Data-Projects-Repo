@@ -97,7 +97,7 @@ def build_dim_datetime(conn: sqlite3.Connection) -> None:
         conn.execute("DROP TABLE IF EXISTS gold_dim_datetime")
         conn.execute("""
             CREATE TABLE gold_dim_datetime (
-                datetime_id      INTEGER PRIMARY KEY,
+                unix_time        INTEGER PRIMARY KEY,
                 datetime_utc     TEXT    NOT NULL,
                 datetime_local   TEXT    NOT NULL,
                 date             TEXT    NOT NULL,
