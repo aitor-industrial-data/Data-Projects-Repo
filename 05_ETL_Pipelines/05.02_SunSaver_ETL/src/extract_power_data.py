@@ -186,23 +186,43 @@ def load_generation_to_silver(df: pd.DataFrame, table_name: str = "clean_calcula
         return False
 
 
-def extract_generation_data() -> bool:
+def extract_generation_data() -> int: 
+    """
+    Orquestador del motor de cálculo: 
+    Extrae datos combinados, calcula métricas PV y carga en Silver/Gold.
+    Devuelve el número de cálculos realizados.
+    """
     try:
-        # 1. Extracción (Capa Bronze)
-        pv_genetation=get_merged_silver_data()
+        # 1. Extracción (Obtenemos el cruce de Clientes + Clima)
+        df_merged = get_merged_silver_data()
         
-        # 2. Transformación (Limpieza y tipos)
-        pv_genetation= transform_pv_generation(pv_genetation)
+        if df_merged.empty:
+            logger.warning("No hay datos nuevos para calcular generación.")
+            return 0
+
+        # 2. Transformación (Cálculos físicos del motor PV)
+        df_calculated = transform_pv_generation(df_merged)
         
-        # 3. Carga (Capa Silver)
-        load_generation_to_silver(pv_genetation)
+        if df_calculated.empty:
+            return 0
+
+        # Guardamos cuántos cálculos se han realizado con éxito
+        total_calculations = len(df_calculated)
+
+        # 3. Carga (Persistencia en la tabla de resultados)
+        success = load_generation_to_silver(df_calculated)
         
-        return True
+        if success:
+            logger.info(f"🚀 Pipeline de Generación finalizado: {total_calculations} cálculos inyectados.")
+            logger.info(f"Datos totales procesados: {total_calculations}")
+            return total_calculations
+        
+        return 0
 
     except Exception as e:
-        # Registramos el error con detalle para debuguear después
-        logger.error(f"❌ Error crítico en el pipeline de extract_generation_data: {e}")
-        return False
+        logger.error(f"❌ Error crítico en extract_generation_data: {e}")
+        return 0
+
 
 if __name__ == "__main__":
 

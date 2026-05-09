@@ -80,12 +80,13 @@ def ingest_openweather_to_bronze(api_response: dict, client_id: str) -> Optional
         return None
 
 
-def extract_openweather(client_table: str = 'clean_clients') -> bool:
+def extract_openweather(client_table: str = 'clean_clients') -> int:
     """
     Obtiene el clima, genera archivos Bronze y actualiza el manifiesto de control.
     Devuelve True si se generaron nuevas tareas, False en caso contrario.
     """
     try:
+        files_created_count = 0
         db_path = workspace_manager.get_db_path()
             
         # 1. LEER CLIENTES
@@ -106,6 +107,7 @@ def extract_openweather(client_table: str = 'clean_clients') -> bool:
                 raw_weather = extract_weather(lat, lon)
 
                 if raw_weather:
+                    files_created_count += 1
                     path_file = ingest_openweather_to_bronze(raw_weather, client_id)
                     
                     new_extractions.append({
@@ -143,10 +145,10 @@ def extract_openweather(client_table: str = 'clean_clients') -> bool:
                 json.dump(all_tasks, f, indent=4, ensure_ascii=False)
             
             logger.info(f"📄 Manifiesto openweather actualizado: {len(new_extractions)} nuevas tareas introducidas.")
-
-            return True # Indicamos que hay trabajo nuevo para el Transform
+            logger.info(f"Datos totales procesados: {files_created_count}")
+            return files_created_count
             
-        return False # No hubo extracciones nuevas
+        return 0 # No hubo extracciones nuevas
     
     except Exception as e:
         logger.critical(f"❌ Error crítico en extract_openweather: {e}")

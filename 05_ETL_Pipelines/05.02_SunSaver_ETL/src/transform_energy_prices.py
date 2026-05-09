@@ -158,7 +158,7 @@ def load_ree_to_silver(df: pd.DataFrame, table_name: str = "clean_prices") -> bo
         return False
 
 
-def transform_energy_prices() -> bool:
+def transform_energy_prices() -> int: # <--- Cambiado a int
     """
     Capa Silver: Lee las tareas 'pending' Y 'error' del manifiesto de REE,
     las transforma y actualiza su estado a 'success' o 'error'.
@@ -166,12 +166,15 @@ def transform_energy_prices() -> bool:
     """
     bronze_dir = workspace_manager.get_bronze_path()
     manifest_path = os.path.join(bronze_dir, "_process_manifest_ree.json")
+    
+    # Acumulador para filas (precios horarios) afectadas
+    session_rows = 0 
  
     try:
         # 1. Verificar si existe el manifiesto
         if not os.path.exists(manifest_path):
             logger.info("☕ No existe el manifiesto de REE. Nada que procesar.")
-            return True
+            return 0 # <--- 0 filas
  
         # 2. Leer todas las tareas
         with open(manifest_path, 'r', encoding='utf-8') as f:
@@ -182,7 +185,7 @@ def transform_energy_prices() -> bool:
  
         if not actionable_tasks:
             logger.info("✅ No hay precios de REE pendientes en el manifiesto.")
-            return True
+            return 0 # <--- 0 filas
  
         pending_count = sum(1 for t in actionable_tasks if t['status'] == 'pending')
         retry_count   = sum(1 for t in actionable_tasks if t['status'] == 'error')
@@ -211,6 +214,9 @@ def transform_energy_prices() -> bool:
                 df_silver = transform_prices_bronze_to_silver(df_raw)
  
                 if not df_silver.empty:
+                    # Guardamos cuántos precios horarios hay en este archivo (deberían ser 24)
+                    rows_in_file = len(df_silver)
+                    
                     load_success = load_ree_to_silver(df_silver)
  
                     if load_success:
@@ -218,6 +224,9 @@ def transform_energy_prices() -> bool:
                         task.pop('error', None)
                         task['updated_at'] = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
                         logger.info(f"✅ Archivo {os.path.basename(path_file)} cargado en Silver correctamente.")
+                        
+                        # SUMAMOS AL CONTADOR DE SESIÓN
+                        session_rows += rows_in_file
                         session_ok += 1
                     else:
                         task['status'] = 'error'
@@ -249,15 +258,16 @@ def transform_energy_prices() -> bool:
         total_pending = sum(1 for t in all_tasks if t['status'] == 'pending')
         logger.info(
             f"💾 Sesión: ✅ {session_ok} ok | ❌ {session_error} errores  —  "
+            f"Filas totales: {session_rows}  —  "
             f"Manifiesto total: ✅ {total_ok} | ❌ {total_error} | ⏳ {total_pending}"
         )
  
-        return session_error == 0
+        logger.info(f"Datos totales procesados: {session_rows}")
+        return session_rows
  
     except Exception as e:
         logger.error(f"❌ Error crítico en el pipeline de transformación de REE: {e}")
-        return False
-
+        return 0
 
 if __name__ == "__main__":
     transform_energy_prices()

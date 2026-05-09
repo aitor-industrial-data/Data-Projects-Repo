@@ -192,7 +192,7 @@ def load_weather_to_silver(df: pd.DataFrame, table_name: str = "clean_weather") 
         return False
 
 
-def transform_openweather() -> bool:
+def transform_openweather() -> int: # <--- Cambiado a int
     """
     Capa Silver: Lee las tareas 'pending' Y 'error' del manifiesto, las transforma
     y actualiza su estado a 'success' o 'error' tras la carga en la DB.
@@ -201,11 +201,14 @@ def transform_openweather() -> bool:
     bronze_dir = workspace_manager.get_bronze_path()
     manifest_path = os.path.join(bronze_dir, "_process_manifest_openweather.json")
     
+    # Acumulador para el total de registros horarios procesados
+    session_rows = 0 
+    
     try:
         # 1. Verificar si existe el manifiesto
         if not os.path.exists(manifest_path):
             logger.info("☕ No existe el manifiesto de control. Nada que procesar.")
-            return True
+            return 0
  
         # 2. Leer todas las tareas
         with open(manifest_path, 'r', encoding='utf-8') as f:
@@ -216,7 +219,7 @@ def transform_openweather() -> bool:
  
         if not actionable_tasks:
             logger.info("✅ No hay tareas pendientes en el manifiesto.")
-            return True
+            return 0
  
         pending_count = sum(1 for t in actionable_tasks if t['status'] == 'pending')
         retry_count   = sum(1 for t in actionable_tasks if t['status'] == 'error')
@@ -250,13 +253,19 @@ def transform_openweather() -> bool:
                 
                 # C. Carga a DB y actualización de estado
                 if not df_silver.empty:
+                    # Contamos cuántas horas de predicción tiene este cliente
+                    rows_in_file = len(df_silver)
+                    
                     load_success = load_weather_to_silver(df_silver)
                     
                     if load_success:
                         task['status'] = 'success'
                         task.pop('error', None)  # Limpiar error previo si el reintento tuvo éxito
                         task['updated_at'] = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
-                        logger.info(f"✅ {client_id} cargado en Silver correctamente.")
+                        logger.info(f"✅ {client_id} cargado en Silver correctamente ({rows_in_file} filas).")
+                        
+                        # SUMAMOS AL CONTADOR DE SESIÓN
+                        session_rows += rows_in_file
                         session_ok += 1
                     else:
                         task['status'] = 'error'
@@ -289,14 +298,16 @@ def transform_openweather() -> bool:
         total_pending = sum(1 for t in all_tasks if t['status'] == 'pending')
         logger.info(
             f"💾 Sesión: ✅ {session_ok} ok | ❌ {session_error} errores  —  "
+            f"Filas totales inyectadas: {session_rows}  —  "
             f"Manifiesto total: ✅ {total_ok} | ❌ {total_error} | ⏳ {total_pending}"
         )
  
-        return session_error == 0
+        logger.info(f"Datos totales procesados: {session_rows}")
+        return session_rows
  
     except Exception as e:
         logger.error(f"❌ Error crítico en el pipeline de transformación: {e}")
-        return False
+        return 0
 
     
 if __name__ == "__main__":

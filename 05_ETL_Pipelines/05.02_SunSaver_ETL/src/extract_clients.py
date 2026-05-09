@@ -85,7 +85,7 @@ def ingest_clients_to_bronze(api_response: list[dict]) -> Optional[str]:
         
 
 
-def extract_clients() -> bool:
+def extract_clients() -> int:
     """
     Orquestador: Extrae de .xlsx, guarda en Bronze y actualiza el manifiesto.
     """
@@ -93,12 +93,14 @@ def extract_clients() -> bool:
         # 1. Extracción
         raw_clients = extract_clients_from_excel()
         if not raw_clients:
-            return False
+            return 0
+        
+        total_clients = len(raw_clients)
 
         # 2. Ingesta a Bronze
         path_file = ingest_clients_to_bronze(raw_clients)
         if not path_file:
-            return False
+            return 0
 
         # Creamos la lista de "nuevas extracciones" 
         new_extractions = [{
@@ -129,13 +131,13 @@ def extract_clients() -> bool:
             json.dump(all_tasks, f, indent=4, ensure_ascii=False)
         
         # EL LOGGER QUE HAS PEDIDO:
-        logger.info(f"📄 Manifiesto REE actualizado: {len(new_extractions)} nuevas tareas introducidas.")
-        
-        return True
+        logger.info(f"📄 Manifiesto clientes actualizado: {len(new_extractions)} nuevas tareas introducidas.")
+        logger.info(f"datos totales procesados: {total_clients}")       
+        return total_clients
 
     except Exception as e:
         logger.critical(f"❌ Error crítico en extract_energy_prices: {e}")
-        return False
+        return 0
 
 
 

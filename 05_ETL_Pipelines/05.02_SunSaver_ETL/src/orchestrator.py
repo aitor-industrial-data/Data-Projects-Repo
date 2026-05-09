@@ -1,43 +1,14 @@
 """
 orchestrator.py
 ---------------
-Orquestador del pipeline ETL de SunSaver.
-
-Orden de ejecución:
-    STAGE 1 — Extracción Bronze
-        1a. extract_clients          (Excel → raw_clients)
-        1b. extract_energy_prices    (REE API → raw_prices)
-
-    STAGE 2 — Transformación Silver independiente
-        2a. transform_clients        (raw_clients → clean_clients)
-        2b. transform_energy_prices  (raw_prices  → clean_prices)
-
-    STAGE 3 — Extracción dependiente de Silver
-        3a. extract_openweather      (OpenWeather API → raw_weather)  [necesita clean_clients]
-
-    STAGE 4 — Transformación Silver dependiente
-        4a. transform_openweather    (raw_weather → clean_weather)
-
-    STAGE 5 — Cálculo PV  [necesita clean_clients + clean_weather]
-        5a. extract_generation_data  (→ clean_calculations)
-
-    STAGE 6 — Capa Gold
-        6a. transform_gold_dim_clients
-        6b. transform_gold_dim_datetime
-        6c. transform_gold_dim_weather
-        6d. transform_gold_fact_energy  [necesita las 3 dims anteriores]
-
-Uso:
-    python orchestrator.py           # Ejecuta el pipeline completo
-    python orchestrator.py --stage 3 # Ejecuta solo desde el stage indicado
-    python orchestrator.py --dry-run # Muestra el plan sin ejecutar nada
+Orquestador del pipeline ETL de SunSaver con recuento de registros.
 """
 
 import sys
 import time
 import argparse
 from datetime import datetime, timezone
-from typing import Callable
+from typing import Callable, Tuple, Union
 
 # ── Módulos del proyecto ─────────────────────────────────────────────────────
 from logger_config import setup_logging
@@ -60,85 +31,71 @@ logger = setup_logging()
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Definición del pipeline
-# Cada step es: (stage_num, nombre, función a ejecutar)
 # ─────────────────────────────────────────────────────────────────────────────
 PIPELINE: list[tuple[int, str, Callable]] = [
-    # STAGE 1 — Bronze: fuentes externas, sin dependencias entre sí
     (1, "extract_clients",           extract_clients.extract_clients),
     (1, "extract_energy_prices",     extract_energy_prices.extract_energy_prices),
-
-    # STAGE 2 — Silver: transformaciones independientes
     (2, "transform_clients",         transform_clients.transform_clients),
     (2, "transform_energy_prices",   transform_energy_prices.transform_energy_prices),
-
-    # STAGE 3 — Bronze dependiente: necesita clean_clients para saber coordenadas
     (3, "extract_openweather",       extract_openweather.extract_openweather),
-
-    # STAGE 4 — Silver dependiente: normaliza el JSON crudo del clima
     (4, "transform_openweather",     transform_openweather.transform_openweather),
-
-    # STAGE 5 — Cálculo PV: necesita clean_clients + clean_weather
     (5, "extract_generation_data",   extract_power_data.extract_generation_data),
-
-    # STAGE 6 — Gold: dimensiones primero, fact table al final
     (6, "gold_dim_clients",          transform_gold_dim_clients.load_dim_client),
     (6, "gold_dim_datetime",         transform_gold_dim_datetime.load_dim_datetime),
     (6, "gold_dim_weather",          transform_gold_dim_weather.load_dim_weather),
     (6, "gold_fact_energy",          transform_gold_fact_energy.load_fact_energy_forecast),
 ]
 
-
 # ─────────────────────────────────────────────────────────────────────────────
 # Runner
 # ─────────────────────────────────────────────────────────────────────────────
 
-def run_step(name: str, fn: Callable, dry_run: bool = False) -> bool:
+def run_step(name: str, fn: Callable, dry_run: bool = False) -> Tuple[bool, int]:
     """
-    Ejecuta un paso del pipeline con cronómetro y captura de excepciones.
-    Devuelve True si tuvo éxito, False si falló.
+    Ejecuta un paso del pipeline. 
+    Devuelve: (éxito: bool, filas_procesadas: int)
     """
     if dry_run:
         logger.info(f" [DRY-RUN] {name}")
-        return True
+        return True, 0
 
     logger.info(f"  ▶  {name} ...")
     t0 = time.monotonic()
 
     try:
+        # Ejecutamos la función. Se espera que devuelva un entero (filas) o True/False.
         result = fn()
         elapsed = time.monotonic() - t0
 
-        
         if result is False:
             logger.error(f"  ✗  {name} devolvió False ({elapsed:.1f}s)")
-            return False
+            return False, 0
 
-        logger.info(f"  ✔  {name} completado ({elapsed:.1f}s)")
-        return True
+        # Si el resultado es un entero, lo usamos como recuento; si es True, usamos 0.
+        rows = result if isinstance(result, int) else 0
+        
+        logger.info(f"  ✔  {name} completado ({elapsed:.1f}s) | Filas: {rows}")
+        return True, rows
 
     except Exception as e:
         elapsed = time.monotonic() - t0
         logger.error(f"  ✗  {name} lanzó excepción ({elapsed:.1f}s): {e}", exc_info=True)
-        return False
+        return False, 0
 
 
 def run_pipeline(from_stage: int = 1, dry_run: bool = False) -> bool:
     """
-    Ejecuta el pipeline completo desde `from_stage`.
-    Si algún stage falla completamente, aborta y registra el error.
+    Ejecuta el pipeline completo y consolida métricas.
     """
-
-    # --- INICIO DE MÉTRICAS ---
     t_global_start = time.monotonic() 
     started_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     pipeline_status = "SUCCESS"
-    error_detail = None  # <--- Para capturar el mensaje de error
-    total_rows_affected = 0 # <--- Para sumar el volumen de datos
-    # --------------------------
+    errors_list = []
+    total_rows_processed = 0  # <--- Acumulador de registros reales
 
     logger.info("\n"+ "*" * 120)
     logger.info("=" * 60)
-    logger.info(f"  PIPELINE SUNSAVER — inicio: {started_at}")
+    logger.info(f"  PIPELINE SUNSAVER — inicio (UTC): {started_at}")
     
     if from_stage > 1:
         logger.info(f"  Arrancando desde stage {from_stage}")
@@ -160,63 +117,56 @@ def run_pipeline(from_stage: int = 1, dry_run: bool = False) -> bool:
                 current_stage = stage_num
                 logger.info(f"\n── STAGE {stage_num} {'─'*40}")
 
-            # Ejecutamos el paso
-            ok = run_step(name, fn, dry_run=dry_run)
+            # Ejecutamos el paso y capturamos éxito y filas
+            ok, rows = run_step(name, fn, dry_run=dry_run)
+            total_rows_processed += rows
 
             stage_results.setdefault(stage_num, []).append(ok)
             
             if ok:
                 steps_ok += 1
-                # Si tus funciones devuelven el número de filas, aquí podrías sumarlas
-                # total_rows_affected += (el_retorno_de_fn)
             else:
                 steps_ko += 1
-                # Capturamos el nombre del primer step que falla como error descriptivo
-                if error_detail is None:
-                    error_detail = f"Fallo en step: {name}"
+                errors_list.append(name)
 
-            # Verificación de fallo total del stage
             if not any(stage_results[stage_num]):
                 pipeline_status = f"FAILED AT STAGE {stage_num}"
-                error_detail = f"Stage {stage_num} abortado completamente tras fallo en {name}"
-                logger.critical(f"\n💥 {error_detail}")
+                logger.critical(f"\n💥 Stage {stage_num} ha abortado completamente.")
                 return False
 
     except Exception as e:
         pipeline_status = "CRITICAL ERROR"
-        error_detail = str(e) # Captura excepciones no controladas del sistema
+        errors_list.append(f"EXCEPTION: {str(e)[:50]}...")
         logger.error(f"Error inesperado en el orquestador: {e}")
         raise e
 
     finally:
-        # --- FINALIZACIÓN Y GUARDADO DE METADATOS ---
         elapsed_total = time.monotonic() - t_global_start
-        
+        error_detail = f"Fallos en: {', '.join(errors_list)}" if errors_list else None
+
         if steps_ko > 0 and "FAILED" not in pipeline_status:
             pipeline_status = "PARTIAL SUCCESS"
 
         if not dry_run:
             try:
-                # Ahora pasamos status, duration, rows y el error capturado
+                # Ahora 'rows' guarda el recuento total acumulado de registros procesados
                 save_etl_metadata(
                     status=pipeline_status, 
-                    duration=elapsed_total,
-                    rows=steps_ok, # Por ahora usamos steps exitosos como volumen
+                    duration=round(elapsed_total, 2),
+                    rows=total_rows_processed, 
                     error=error_detail
                 )
-                logger.info(f"[METADATA] Ejecución registrada en base de datos. Status: {pipeline_status}")
+                logger.info(f"[METADATA] Registro guardado. Status: {pipeline_status} | Total Filas: {total_rows_processed}")
             except Exception as meta_err:
                 logger.error(f"[METADATA] Error al guardar auditoría: {meta_err}")
 
         logger.info("\n" + "=" * 104)
-        logger.info(f"  PIPELINE FINALIZADO en {elapsed_total:.1f}s")
-        logger.info(f"  Steps OK: {steps_ok}  |  Steps KO: {steps_ko}")
+        logger.info(f"  PIPELINE FINALIZADO en {elapsed_total:.2f}s")
+        logger.info(f"  Total Filas: {total_rows_processed}  |  Steps OK: {steps_ok}  |  Steps KO: {steps_ko}")
 
     return steps_ko == 0
 
-# ─────────────────────────────────────────────────────────────────────────────
-# CLI
-# ─────────────────────────────────────────────────────────────────────────────
+# ── CLI ──────────────────────────────────────────────────────────────────────
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -224,24 +174,11 @@ def parse_args() -> argparse.Namespace:
         formatter_class=argparse.RawTextHelpFormatter,
     )
     parser.add_argument(
-        "--stage",
-        type=int,
-        default=1,
-        metavar="N",
-        help=(
-            "Stage desde el que arrancar (1-6). Útil para reejecutar\n"
-            "solo la parte que falló sin repetir todo el pipeline.\n"
-            "  1 = Bronze completo (por defecto)\n"
-            "  2 = Silver independiente\n"
-            "  3 = OpenWeather extract\n"
-            "  4 = OpenWeather transform\n"
-            "  5 = Cálculo PV\n"
-            "  6 = Capa Gold"
-        ),
+        "--stage", type=int, default=1, metavar="N",
+        help="Stage desde el que arrancar (1-6)."
     )
     parser.add_argument(
-        "--dry-run",
-        action="store_true",
+        "--dry-run", action="store_true",
         help="Muestra el plan de ejecución sin llamar a ninguna función.",
     )
     return parser.parse_args()
@@ -249,6 +186,5 @@ def parse_args() -> argparse.Namespace:
 
 if __name__ == "__main__":
     args = parse_args()
-
     success = run_pipeline(from_stage=args.stage, dry_run=args.dry_run)
     sys.exit(0 if success else 1)

@@ -185,35 +185,36 @@ def load_clients_to_silver(df: pd.DataFrame, table_name: str = "clean_clients") 
         return False
 
 
-def transform_clients() -> bool:
+def transform_clients() -> int:
     """
     Capa Silver: Lee las tareas 'pending' Y 'error' del manifiesto, las transforma
-    y actualiza su estado a 'success' o 'error' tras la carga en la DB.
-    Las tareas con 'error' se reintentan automaticamente en cada ejecucion.
+    y actualiza su estado. Devuelve el TOTAL de filas insertadas en la sesión.
     """
     bronze_dir = workspace_manager.get_bronze_path()
     manifest_path = os.path.join(bronze_dir, "_process_manifest_clients.json")
     
+    # Acumulador para el rows_affected total de la sesión
+    session_rows = 0 
+    
     try:
         if not os.path.exists(manifest_path):
             logger.info("No existe el manifiesto de control. Nada que procesar.")
-            return True
+            return 0
 
         with open(manifest_path, 'r', encoding='utf-8') as f:
             all_tasks = json.load(f)
 
-        # Procesar tareas pendientes Y las que fallaron anteriormente (reintento)
+        
         actionable_tasks = [t for t in all_tasks if t['status'] in ('pending', 'error')]
 
         if not actionable_tasks:
             logger.info("✅ No hay tareas pendientes en el manifiesto.")
-            return True
+            return 0
 
         pending_count = sum(1 for t in actionable_tasks if t['status'] == 'pending')
         retry_count   = sum(1 for t in actionable_tasks if t['status'] == 'error')
-        logger.info(f"🚀 {pending_count} tareas nuevas + {retry_count} reintentos. Iniciando transformacion...")
+        logger.info(f"🚀 {pending_count} tareas nuevas + {retry_count} reintentos. Iniciando transformación...")
 
-        # Contadores de la sesion actual (no historicos)
         session_ok    = 0
         session_error = 0
 
@@ -222,39 +223,43 @@ def transform_clients() -> bool:
             
             try:
                 logger.info(f"Procesando archivo: {os.path.basename(path_file)}")
-
                 df_raw = extract_clients_from_json(path_file)
                 
                 if df_raw.empty:
-                    logger.warning(f"⚠️ El archivo {os.path.basename(path_file)} esta vacio o corrupto.")
+                    logger.warning(f"⚠️ El archivo {os.path.basename(path_file)} está vacío o corrupto.")
                     task['status'] = 'error'
-                    task['error'] = 'Archivo vacio o corrupto'
+                    task['error'] = 'Archivo vacío o corrupto'
                     task['updated_at'] = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
                     session_error += 1
                     continue
 
+                # Transformación (donde aplicas tus filtros de latitud, eficiencia, etc.)
                 df_silver = transform_clients_bronze_to_silver(df_raw)
                 
                 if not df_silver.empty:
+                    # Capturamos cuántas filas han sobrevivido a la limpieza
+                    current_file_rows = len(df_silver)
+                    
                     load_success = load_clients_to_silver(df_silver)
                     
                     if load_success:
                         task['status'] = 'success'
-                        task.pop('error', None)  # Limpiar error previo si el reintento tuvo exito
+                        task.pop('error', None) 
                         task['updated_at'] = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
-                        logger.info(f"✅ Archivo {os.path.basename(path_file)} cargado en Silver correctamente.")
+                        
+                        # Sumamos al contador de la sesión
+                        session_rows += current_file_rows
                         session_ok += 1
+                        logger.info(f"✅ {os.path.basename(path_file)} cargado: {current_file_rows} filas.")
                     else:
                         task['status'] = 'error'
                         task['error'] = 'Fallo la carga en DB'
                         task['updated_at'] = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
-                        logger.error(f"❌ Fallo la carga en DB para el archivo {os.path.basename(path_file)}.")
                         session_error += 1
                 else:
                     task['status'] = 'error'
-                    task['error'] = 'DataFrame vacio tras transformacion Silver'
+                    task['error'] = 'DataFrame vacío tras transformación'
                     task['updated_at'] = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
-                    logger.error(f"❌ Transformacion devolvio DataFrame vacio para {os.path.basename(path_file)}.")
                     session_error += 1
 
             except Exception as e:
@@ -265,24 +270,23 @@ def transform_clients() -> bool:
                 session_error += 1
                 continue 
 
-        # Persistir cambios en el manifiesto
+        # Guardar el manifiesto con los estados actualizados
         with open(manifest_path, 'w', encoding='utf-8') as f:
             json.dump(all_tasks, f, indent=4, ensure_ascii=False)
 
-        # Resumen de sesion actual + estado global del manifiesto
-        total_ok      = sum(1 for t in all_tasks if t['status'] == 'success')
-        total_error   = sum(1 for t in all_tasks if t['status'] == 'error')
-        total_pending = sum(1 for t in all_tasks if t['status'] == 'pending')
+        # Resumen final en logs
+        total_ok = sum(1 for t in all_tasks if t['status'] == 'success')
         logger.info(
-            f"💾 Sesión: ✅ {session_ok} ok | ❌ {session_error} errores  —  "
-            f"Manifiesto total: ✅ {total_ok} | ❌ {total_error} | ⏳ {total_pending}"
+            f"💾 Sesión: ✅ {session_ok} ok | ❌ {session_error} errores. "
+            f"Total filas afectadas: {session_rows}"
         )
 
-        return session_error == 0
+        logger.info(f"Datos totales procesados: {session_rows}")
+        return session_rows
 
     except Exception as e:
-        logger.error(f"❌ Error critico en el pipeline de transformacion de clients: {e}")
-        return False
+        logger.error(f"❌ Error crítico en transform_clients: {e}")
+        return 0
 
 
 
