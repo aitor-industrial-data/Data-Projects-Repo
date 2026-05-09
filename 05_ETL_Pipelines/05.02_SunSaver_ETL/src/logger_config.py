@@ -3,35 +3,44 @@ import os
 from pathlib import Path
 from datetime import datetime
 
-def setup_logging():
-    
+
+def setup_logging() -> logging.Logger:
+    """
+    Configures and returns the centralised SunSaver logger.
+
+    Output format  : TIMESTAMP | LEVEL    | MODULE  | MESSAGE
+    Destinations   : rotating daily file  +  stderr console
+    Logger name    : 'SunSaver'  (singleton — safe to call from multiple modules)
+    """
+
     BASE_DIR = Path(__file__).resolve().parent.parent
-    log_dir = BASE_DIR / "logs"
-    
-    if not os.path.exists(log_dir):
-        os.makedirs(log_dir)
+    log_dir  = BASE_DIR / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
 
-    
-    today = datetime.now().strftime("%Y-%m-%d")
-    log_filename = f"SunSaver_{today}.log" 
-    log_path = log_dir / log_filename
+    log_path = log_dir / f"sunsaver_{datetime.now().strftime('%Y-%m-%d')}.log"
 
-    logger = logging.getLogger("SunSaver_System")
-    logger.setLevel(logging.INFO)
+    logger = logging.getLogger("SunSaver")
+    logger.setLevel(logging.DEBUG)          # Root level: DEBUG — handlers filter further
 
-    if not logger.handlers:
-        file_handler = logging.FileHandler(log_path, mode='a', encoding='utf-8')
-        console_handler = logging.StreamHandler()
+    if logger.handlers:                     # Idempotent: skip if already configured
+        return logger
 
-        formatter = logging.Formatter('%(asctime)s | %(levelname)-8s | %(module)s | %(message)s', 
-                                    datefmt='%Y-%m-%d %H:%M:%S')
-        
-        file_handler.setFormatter(formatter)
-        console_handler.setFormatter(formatter)
+    fmt = logging.Formatter(
+        fmt     = "%(asctime)s | %(levelname)-8s | %(module)-30s | %(message)s",
+        datefmt = "%Y-%m-%d %H:%M:%S",
+    )
 
-        logger.addHandler(file_handler)
-        logger.addHandler(console_handler)
+    # ── File handler (INFO+) ──────────────────────────────────────────────────
+    fh = logging.FileHandler(log_path, mode="a", encoding="utf-8")
+    fh.setLevel(logging.INFO)
+    fh.setFormatter(fmt)
+
+    # ── Console handler (INFO+) ───────────────────────────────────────────────
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.INFO)
+    ch.setFormatter(fmt)
+
+    logger.addHandler(fh)
+    logger.addHandler(ch)
 
     return logger
-
-

@@ -2,23 +2,35 @@ import sqlalchemy
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 from datetime import datetime, timezone
+
 import workspace_manager
 from logger_config import setup_logging
 
-# Configuración de logs y base de datos
-logger = setup_logging()
+
+logger  = setup_logging()
 DB_PATH = workspace_manager.get_db_path()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# BUILD
+# ─────────────────────────────────────────────────────────────────────────────
 
 def build_fact_energy_forecast(engine: sqlalchemy.engine.Engine) -> int:
     """
-    Actualiza la tabla gold_fact_energy_forecast de forma incremental usando SQLAlchemy.
-    JOIN directo en unix_time con PVPC horario de clean_prices.
+    Incrementally upserts the Gold fact table by joining the active forecast
+    window (unix_time >= now - 2h) from clean_calculations with clean_weather
+    and clean_prices.  Returns the number of rows affected.
     """
-    try:
-        logger.info("Iniciando actualización de ventana activa en Gold Layer (SQLAlchemy)...")
+    logger.info("[INIT] ── build_fact_energy_forecast starting ──────────────")
 
+    buffer_seconds = 7200
+    start_unix     = int(datetime.now(timezone.utc).timestamp()) - buffer_seconds
+
+    logger.info("[EXTRACT] Active window lower bound: unix_time >= %d (now - %ds)", start_unix, buffer_seconds)
+
+    try:
         with engine.begin() as conn:
-            # 1. Asegurar esquema de la Fact Table
+            # Ensure table exists with full schema
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS gold_fact_energy_forecast (
                     client_id               TEXT    NOT NULL,
@@ -41,13 +53,7 @@ def build_fact_energy_forecast(engine: sqlalchemy.engine.Engine) -> int:
                 )
             """))
 
-            # 2. Ventana de tiempo con margen (2 horas)
-            buffer_seconds = 7200
-            start_unix = int(datetime.now(timezone.utc).timestamp()) - buffer_seconds
-
-            # 3. UPSERT Incremental (INSERT OR REPLACE)
-            # Usamos parámetros nombrados (:start_unix) para mayor seguridad
-            query_upsert = text(f"""
+            result = conn.execute(text("""
                 INSERT OR REPLACE INTO gold_fact_energy_forecast
                 SELECT
                     c.client_id,
@@ -64,7 +70,7 @@ def build_fact_energy_forecast(engine: sqlalchemy.engine.Engine) -> int:
                     w.rain_prob_norm,
                     w.wind_speed_mps,
                     w.weather_id,
-                    pvpc.price_euro_mwh     AS price_pvpc_eur_mwh,
+                    pvpc.price_euro_mwh             AS price_pvpc_eur_mwh,
                     STRFTIME('%Y-%m-%d %H:%M:%S', 'now') AS _loaded_at_utc
                 FROM clean_calculations c
                 LEFT JOIN clean_weather w
@@ -74,43 +80,51 @@ def build_fact_energy_forecast(engine: sqlalchemy.engine.Engine) -> int:
                     ON  pvpc.unix_time  = c.unix_time
                     AND pvpc.price_type = 'PVPC'
                 WHERE c.unix_time >= :start_unix
-            """)
-            
-            result = conn.execute(query_upsert, {"start_unix": start_unix})
+            """), {"start_unix": start_unix})
+
             rows_affected = result.rowcount
 
-            # 4. Optimización mediante Índices
-            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_gold_fact_unix_time  ON gold_fact_energy_forecast (unix_time)"))
-            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_gold_fact_weather_id ON gold_fact_energy_forecast (weather_id)"))
+            # Optimisation indexes — idempotent
+            conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS idx_gold_fact_unix_time  "
+                "ON gold_fact_energy_forecast (unix_time)"
+            ))
+            conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS idx_gold_fact_weather_id "
+                "ON gold_fact_energy_forecast (weather_id)"
+            ))
 
-            logger.info(
-                f"✅ Gold Layer actualizada: {rows_affected} registros "
-                f"(Unixtime >= {start_unix})"
-            )
-            logger.info(f"Datos totales procesados: {rows_affected}")
-            return rows_affected
+        logger.info(
+            "[DONE] gold_fact_energy_forecast updated — rows upserted: %d (window start: %d)",
+            rows_affected, start_unix,
+        )
+        return rows_affected
 
-    except SQLAlchemyError as e:
-        logger.error(f"❌ Error de SQLAlchemy en build_fact_energy_forecast: {e}")
+    except SQLAlchemyError as exc:
+        logger.error("[ERROR] SQLAlchemy error in build_fact_energy_forecast: %s", exc)
         raise
-    except Exception as e:
-        logger.error(f"❌ Error inesperado en la tabla de hechos: {e}")
+    except Exception as exc:
+        logger.error("[ERROR] Unexpected error in build_fact_energy_forecast: %s", exc)
         raise
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ORCHESTRATOR ENTRY POINT
+# ─────────────────────────────────────────────────────────────────────────────
 
 def load_fact_energy_forecast() -> int:
-    """Maneja la conexión y el retorno del conteo de filas para el orquestador."""
+    """Module entry point. Returns the number of rows upserted (0 on failure)."""
     try:
-        # Siguiendo tus specs de Ubuntu nativo y WSL2
         engine = create_engine(f"sqlite:///{DB_PATH}")
-        # Habilitar claves foráneas en la sesión si fuera necesario
         with engine.connect() as conn:
             conn.execute(text("PRAGMA foreign_keys = ON"))
-        
         return build_fact_energy_forecast(engine)
-    except Exception as e:
-        logger.critical(f"Fallo crítico al cargar la Fact Table: {e}")
+    except Exception as exc:
+        logger.critical("[ERROR] Critical failure in load_fact_energy_forecast: %s", exc)
         return 0
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     load_fact_energy_forecast()
