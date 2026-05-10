@@ -3,105 +3,92 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
-from typing import Union
-
 import config_paths
 from logger_config import setup_logging
 
-"""
-GOLD LAYER: TIME DIMENSION (DATETIME)
--------------------------------------
-Author: Aitor Asin
-Description: Generates the Time Dimension for the analytical model. 
-             Handles timezone conversions (UTC to Madrid) and 
-             injects business logic for Spanish electricity tariffs.
-"""
-
+# Configuración de logs y base de datos
 logger = setup_logging()
-
-# Business Rules Constants
+DB_PATH = config_paths.get_db_path()
 SPAIN_TZ = ZoneInfo("Europe/Madrid")
-FESTIVOS_NACIONALES = {
-    (1, 1), (1, 6), (5, 1), (8, 15),
-    (10, 12), (11, 1), (12, 6), (12, 8), (12, 25),
-}
-TARIFF_LABELS = {"P1": "punta", "P2": "llano", "P3": "valle", "P6": "super-valle"}
 
-# ─────────────────────────────────────────────────────────────────────────────
-# ANALYTICAL LOGIC: ELECTRICITY TARIFFS
-# ─────────────────────────────────────────────────────────────────────────────
+# Constantes de negocio
+FESTIVOS_NACIONALES = {
+    (1,  1), (1,  6), (5,  1), (8,  15), 
+    (10, 12), (11, 1), (12, 6), (12, 8), (12, 25)
+}
+
+TARIFF_LABELS = {
+    "P1": "punta",
+    "P2": "llano",
+    "P3": "valle",
+    "P6": "super-valle",
+}
 
 def get_tariff_period(dt_local: datetime) -> str:
-    """
-    Classifies a timestamp into the 2.0TD Spanish tariff periods.
-    Strategic for energy cost optimization analytics.
-    """
-    # Weekends and Bank Holidays are always P6 (Off-peak)
-    if dt_local.weekday() >= 5 or (dt_local.month, dt_local.day) in FESTIVOS_NACIONALES:
+    """Devuelve el periodo tarifario (P1/P2/P3/P6) según normativa española."""
+    is_weekend = dt_local.weekday() >= 5
+    is_festivo = (dt_local.month, dt_local.day) in FESTIVOS_NACIONALES
+
+    if is_weekend or is_festivo:
         return "P6"
-    
+
     h = dt_local.hour
     if 10 <= h < 14 or 18 <= h < 22:
-        return "P1" # Peak
-    if 8 <= h < 10 or 14 <= h < 18 or 22 <= h < 24:
-        return "P2" # Mid-peak
-    
-    return "P3" # Flat/Valley
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# BUILD PROCESS
-# ─────────────────────────────────────────────────────────────────────────────
+        return "P1"
+    elif 8 <= h < 10 or 14 <= h < 18 or 22 <= h < 24:
+        return "P2"
+    else:
+        return "P3"
 
 def build_dim_datetime(engine: sqlalchemy.engine.Engine) -> int:
     """
-    Extracts unique timestamps from Silver layer and enriches them 
-    with calendar attributes and energy market segments.
+    Genera gold_dim_datetime a partir de los datos de clean_weather usando SQLAlchemy.
+    Retorna el número de filas insertadas.
     """
-    logger.info("[INIT] ── Rebuilding gold_dim_datetime ──────────────────────")
-
     try:
-        # 1. SOURCE EXTRACTION: Distinct slots from weather data
-        with engine.connect() as conn:
-            result = conn.execute(text("""
-                SELECT unix_time, MAX(is_daylight) AS is_daylight
-                FROM clean_weather
-                GROUP BY unix_time
+        logger.info("Generando gold_dim_datetime a partir de clean_weather (SQLAlchemy)...")
+        
+        with engine.begin() as conn:
+            # 1. Extracción de datos únicos
+            query_select = text("""
+                SELECT unix_time, MAX(is_daylight) as is_daylight 
+                FROM clean_weather 
+                GROUP BY unix_time 
                 ORDER BY unix_time
-            """))
+            """)
+            
+            result = conn.execute(query_select)
             rows = result.fetchall()
 
-        if not rows:
-            logger.warning("[EXTRACT] No data found in clean_weather")
-            return 0
+            if not rows:
+                logger.warning("clean_weather está vacía — no se generó gold_dim_datetime")
+                return 0
 
-        # 2. TRANSFORMATION: Dimensional Enrichment
-        registros = []
-        for row in rows:
-            # Timezone management: UTC to Local (Europe/Madrid)
-            dt_utc = datetime.fromtimestamp(row.unix_time, tz=timezone.utc)
-            dt_local = dt_utc.astimezone(SPAIN_TZ)
-            period = get_tariff_period(dt_local)
+            # 2. Transformación a lista de diccionarios (Formato óptimo para SQLAlchemy)
+            registros = []
+            for row in rows:
+                dt_utc   = datetime.fromtimestamp(row.unix_time, tz=timezone.utc)
+                dt_local = dt_utc.astimezone(SPAIN_TZ)
+                tariff_period = get_tariff_period(dt_local)
 
-            registros.append({
-                "unix_time":      row.unix_time,
-                "datetime_utc":   dt_utc.strftime("%Y-%m-%d %H:%M:%S"),
-                "datetime_local": dt_local.strftime("%Y-%m-%d %H:%M:%S"),
-                "date":           dt_local.strftime("%Y-%m-%d"),
-                "hour_utc":       dt_utc.hour,
-                "hour_local":     dt_local.hour,
-                "day_of_week":    dt_local.strftime("%A").lower(),
-                "is_daylight":    row.is_daylight,
-                "is_weekend":     1 if dt_local.weekday() >= 5 else 0,
-                "is_festivo":     1 if (dt_local.month, dt_local.day) in FESTIVOS_NACIONALES else 0,
-                "month":          dt_local.month,
-                "year":           dt_local.year,
-                "tariff_period":  period,
-                "tariff_label":   TARIFF_LABELS[period],
-            })
+                registros.append({
+                    "unix_time":      row.unix_time,
+                    "datetime_utc":   dt_utc.strftime("%Y-%m-%d %H:%M:%S"),
+                    "datetime_local": dt_local.strftime("%Y-%m-%d %H:%M:%S"),
+                    "date":           dt_utc.strftime("%Y-%m-%d"),
+                    "hour_utc":       dt_utc.hour,
+                    "hour_local":     dt_local.hour,
+                    "day_of_week":    dt_local.strftime("%A").lower(),
+                    "is_daylight":    row.is_daylight,
+                    "is_weekend":     1 if dt_local.weekday() >= 5 else 0,
+                    "is_festivo":     1 if (dt_local.month, dt_local.day) in FESTIVOS_NACIONALES else 0,
+                    "month":          dt_local.month,
+                    "year":           dt_local.year,
+                    "tariff_period":  tariff_period,
+                    "tariff_label":   TARIFF_LABELS[tariff_period]
+                })
 
-        # 3. ATOMIC LOAD
-        with engine.begin() as conn:
+            # 3. Preparación de la tabla Gold
             conn.execute(text("DROP TABLE IF EXISTS gold_dim_datetime"))
             conn.execute(text("""
                 CREATE TABLE gold_dim_datetime (
@@ -121,36 +108,38 @@ def build_dim_datetime(engine: sqlalchemy.engine.Engine) -> int:
                     tariff_label     TEXT    NOT NULL
                 )
             """))
-            
-            conn.execute(text("""
+
+            # 4. Inserción masiva
+            insert_query = text("""
                 INSERT INTO gold_dim_datetime VALUES (
-                    :unix_time, :datetime_utc, :datetime_local, :date, :hour_utc,
-                    :hour_local, :day_of_week, :is_daylight, :is_weekend,
+                    :unix_time, :datetime_utc, :datetime_local, :date, :hour_utc, 
+                    :hour_local, :day_of_week, :is_daylight, :is_weekend, 
                     :is_festivo, :month, :year, :tariff_period, :tariff_label
                 )
-            """), registros)
+            """)
+            
+            conn.execute(insert_query, registros)
+            
+            total_filas = len(registros)
+            logger.info(f"✅ gold_dim_datetime generada: {total_filas} filas insertadas")
+            logger.info(f"Datos totales procesados: {total_filas}")
+            return total_filas
 
-        logger.info("[DONE] gold_dim_datetime refreshed — Records: %d", len(registros))
-        return len(registros)
-
-    except SQLAlchemyError as exc:
-        logger.error("[ERROR] SQL Integrity failure: %s", exc)
+    except SQLAlchemyError as e:
+        logger.error(f"❌ Error de base de datos en build_dim_datetime: {e}")
         raise
-    except Exception as exc:
-        logger.error("[ERROR] Transformation logic failure: %s", exc)
+    except Exception as e:
+        logger.error(f"❌ Error inesperado procesando fechas: {e}")
         raise
 
-
-def load_dim_datetime() -> Union[int, bool]:
-    """Orchestrator entry point for the datetime dimension."""
+def load_dim_datetime() -> int:
+    """Maneja el ciclo de vida del motor de base de datos."""
     try:
-        db_path = config_paths.get_db_path()
-        engine = create_engine(f"sqlite:///{db_path}")
+        engine = create_engine(f"sqlite:///{DB_PATH}")
         return build_dim_datetime(engine)
-    except Exception as exc:
-        logger.critical("[ERROR] Critical failure in load_dim_datetime: %s", exc)
-        return False
-
+    except Exception as e:
+        logger.critical(f"Fallo crítico en el cargador de dimensiones temporales: {e}")
+        return 0
 
 if __name__ == "__main__":
     load_dim_datetime()
