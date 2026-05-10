@@ -1,73 +1,61 @@
 import sqlalchemy
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
+from typing import Union
 
-import workspace_manager
+import config_paths
 from logger_config import setup_logging
 
+"""
+GOLD LAYER: DIMENSION MODELING (CLIENTS)
+----------------------------------------
+Author: Aitor Asin
+Description: Rebuilds the Gold-level client dimension. Implements business 
+             logic for derived features (flags) and ensures schema 
+             integrity for analytical downstream consumers.
+"""
 
 logger = setup_logging()
-DB_PATH = workspace_manager.get_db_path()
-
 
 # ─────────────────────────────────────────────────────────────────────────────
-# BUILD
+# BUSINESS LOGIC: DIMENSION REBUILD
 # ─────────────────────────────────────────────────────────────────────────────
 
 def build_dim_client(engine: sqlalchemy.engine.Engine) -> int:
     """
-    Rebuilds gold_dim_client from clean_clients, deriving has_solar and
-    has_battery boolean flags.  Returns the number of rows inserted.
+    Transforms Silver data (clean_clients) into Gold (gold_dim_client).
+    Derives analytical flags: 'has_solar' and 'has_battery'.
     """
-    logger.info("[INIT] ── build_dim_client starting ────────────────────────")
+    logger.info("[INIT] ── Rebuilding gold_dim_client ────────────────────────")
 
     try:
-        with engine.begin() as conn:
-            rows = conn.execute(text("""
-                SELECT
-                    client_id, name, description, latitude, longitude, timezone,
-                    nominal_load_kw, pv_peak_power_kw, panel_area_m2,
-                    efficiency, panel_type, loss_pct, angle, aspect, mounting,
-                    battery_capacity_kwh, soc_min_pct, installation_cost_eur
-                FROM clean_clients
-                ORDER BY client_id
-            """)).fetchall()
+        # 1. EXTRACTION FROM SILVER LAYER
+        with engine.connect() as conn:
+            result = conn.execute(text("SELECT * FROM clean_clients ORDER BY client_id"))
+            rows = result.fetchall()
 
         if not rows:
-            logger.warning("[EXTRACT] clean_clients is empty — gold_dim_client not generated")
+            logger.warning("[EXTRACT] clean_clients is empty — Nothing to process")
             return 0
 
-        logger.info("[EXTRACT] %d client(s) read from clean_clients", len(rows))
+        logger.info("[EXTRACT] %d client(s) loaded for transformation", len(rows))
 
-        registros = [
-            {
-                "client_id":             r.client_id,
-                "name":                  r.name,
-                "description":           r.description,
-                "latitude":              r.latitude,
-                "longitude":             r.longitude,
-                "timezone":              r.timezone,
-                "nominal_load_kw":       r.nominal_load_kw,
-                "pv_peak_power_kw":      r.pv_peak_power_kw,
-                "panel_area_m2":         r.panel_area_m2,
-                "efficiency":            r.efficiency,
-                "panel_type":            r.panel_type,
-                "loss_pct":              r.loss_pct,
-                "angle":                 r.angle,
-                "aspect":                r.aspect,
-                "mounting":              r.mounting,
-                "battery_capacity_kwh":  r.battery_capacity_kwh,
-                "soc_min_pct":           r.soc_min_pct,
-                "installation_cost_eur": r.installation_cost_eur,
-                "has_solar":             1 if (r.pv_peak_power_kw or 0) > 0 else 0,
-                "has_battery":           1 if (r.battery_capacity_kwh or 0) > 0 else 0,
-            }
-            for r in rows
-        ]
+        # 2. TRANSFORMATION: Logic & Feature Derivation
+        # We use dictionary comprehension for cleaner mapping
+        registros = []
+        for r in rows:
+            data = dict(r._mapping)
+            # Add business logic flags
+            data["has_solar"] = 1 if (data.get("pv_peak_power_kw") or 0) > 0 else 0
+            data["has_battery"] = 1 if (data.get("battery_capacity_kwh") or 0) > 0 else 0
+            registros.append(data)
 
-        logger.info("[TRANSFORM] Derived flags computed for %d client(s)", len(registros))
+        logger.info("[TRANSFORM] Business logic applied (Solar/Battery flags)")
 
+        # 3. ATOMIC LOAD (Gold Layer)
+        # We wrap in a transaction (engine.begin) to ensure consistency
         with engine.begin() as conn:
+            # Recreate table with explicit schema
             conn.execute(text("DROP TABLE IF EXISTS gold_dim_client"))
             conn.execute(text("""
                 CREATE TABLE gold_dim_client (
@@ -93,6 +81,8 @@ def build_dim_client(engine: sqlalchemy.engine.Engine) -> int:
                     has_battery             INTEGER NOT NULL
                 )
             """))
+
+            # Bulk Insert using bound parameters (Safe from SQL Injection)
             conn.execute(text("""
                 INSERT INTO gold_dim_client (
                     client_id, name, description, latitude, longitude, timezone,
@@ -110,14 +100,14 @@ def build_dim_client(engine: sqlalchemy.engine.Engine) -> int:
             """), registros)
 
         total = len(registros)
-        logger.info("[DONE] gold_dim_client rebuilt — rows inserted: %d", total)
+        logger.info("[DONE] gold_dim_client refreshed — Total records: %d", total)
         return total
 
     except SQLAlchemyError as exc:
-        logger.error("[ERROR] SQLAlchemy error in build_dim_client: %s", exc)
+        logger.error("[ERROR] SQLAlchemy integrity failure: %s", exc)
         raise
     except Exception as exc:
-        logger.error("[ERROR] Unexpected error in build_dim_client: %s", exc)
+        logger.error("[ERROR] Unexpected transformation error: %s", exc)
         raise
 
 
@@ -125,17 +115,18 @@ def build_dim_client(engine: sqlalchemy.engine.Engine) -> int:
 # ORCHESTRATOR ENTRY POINT
 # ─────────────────────────────────────────────────────────────────────────────
 
-def load_dim_client() -> int:
-    """Module entry point. Returns the number of rows written (0 on failure)."""
+def load_dim_client() -> Union[int, bool]:
+    """
+    Module entry point for the orchestrator.
+    """
     try:
-        engine = create_engine(f"sqlite:///{DB_PATH}")
+        db_path = config_paths.get_db_path()
+        engine = create_engine(f"sqlite:///{db_path}")
         return build_dim_client(engine)
     except Exception as exc:
-        logger.critical("[ERROR] Critical failure in load_dim_client: %s", exc)
-        return 0
+        logger.critical("[ERROR] Dimension build failed: %s", exc)
+        return False
 
-
-# ─────────────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     load_dim_client()

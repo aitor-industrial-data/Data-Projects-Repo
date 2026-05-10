@@ -1,30 +1,38 @@
 import sqlalchemy
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
+from typing import Union
 
-import workspace_manager
+import config_paths
 from logger_config import setup_logging
 
+"""
+GOLD LAYER: WEATHER DIMENSION
+-----------------------------
+Author: Aitor Asin
+Description: Normalizes weather conditions into a canonical dimension table.
+             Uses Window Functions (ROW_NUMBER) to resolve many-to-one 
+             mappings between IDs and descriptions in raw weather data.
+"""
 
-logger  = setup_logging()
-DB_PATH = workspace_manager.get_db_path()
-
+logger = setup_logging()
 
 # ─────────────────────────────────────────────────────────────────────────────
-# BUILD
+# BUILD PROCESS: DATA DENORMALIZATION & CLEANUP
 # ─────────────────────────────────────────────────────────────────────────────
 
 def build_dim_weather(engine: sqlalchemy.engine.Engine) -> int:
     """
-    Generates gold_dim_weather as a type-2 weather condition dimension,
-    using a ROW_NUMBER window function to resolve duplicate weather_id entries
-    by selecting the most frequently observed (main, description) pair.
-    Returns the number of rows inserted.
+    Generates gold_dim_weather. 
+    Implements a 'Most Frequent Wins' logic to ensure each weather_id 
+    has exactly one canonical description.
     """
-    logger.info("[INIT] ── build_dim_weather starting ───────────────────────")
+    logger.info("[INIT] ── Rebuilding gold_dim_weather ───────────────────────")
 
     try:
+        # We use a single transaction block for the entire DDL/DML sequence
         with engine.begin() as conn:
+            # 1. SCHEMA DEFINITION
             conn.execute(text("DROP TABLE IF EXISTS gold_dim_weather"))
             conn.execute(text("""
                 CREATE TABLE gold_dim_weather (
@@ -35,6 +43,9 @@ def build_dim_weather(engine: sqlalchemy.engine.Engine) -> int:
                 )
             """))
 
+            # 2. TRANSFORMATION & LOAD
+            # The CTE/Subquery resolves cases where an ID has multiple descriptions
+            # selecting the most frequent one (Mode) per ID.
             conn.execute(text("""
                 INSERT INTO gold_dim_weather
                 SELECT
@@ -61,14 +72,14 @@ def build_dim_weather(engine: sqlalchemy.engine.Engine) -> int:
 
             total = conn.execute(text("SELECT COUNT(*) FROM gold_dim_weather")).scalar()
 
-        logger.info("[DONE] gold_dim_weather rebuilt — rows inserted: %d", total)
+        logger.info("[DONE] gold_dim_weather refreshed — Unique conditions: %d", total)
         return total
 
     except SQLAlchemyError as exc:
-        logger.error("[ERROR] SQLAlchemy error in build_dim_weather: %s", exc)
+        logger.error("[ERROR] SQL Execution failure: %s", exc)
         raise
     except Exception as exc:
-        logger.error("[ERROR] Unexpected error in build_dim_weather: %s", exc)
+        logger.error("[ERROR] Unexpected error in weather dimension build: %s", exc)
         raise
 
 
@@ -76,17 +87,19 @@ def build_dim_weather(engine: sqlalchemy.engine.Engine) -> int:
 # ORCHESTRATOR ENTRY POINT
 # ─────────────────────────────────────────────────────────────────────────────
 
-def load_dim_weather() -> int:
-    """Module entry point. Returns the number of rows written (0 on failure)."""
+def load_dim_weather() -> Union[int, bool]:
+    """
+    Entry point for the ETL pipeline. 
+    Ensures the weather dimension is ready for fact-table joins.
+    """
     try:
-        engine = create_engine(f"sqlite:///{DB_PATH}")
+        db_path = config_paths.get_db_path()
+        engine = create_engine(f"sqlite:///{db_path}")
         return build_dim_weather(engine)
     except Exception as exc:
         logger.critical("[ERROR] Critical failure in load_dim_weather: %s", exc)
-        return 0
+        return False
 
-
-# ─────────────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     load_dim_weather()

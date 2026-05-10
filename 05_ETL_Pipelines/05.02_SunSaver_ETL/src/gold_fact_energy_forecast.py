@@ -2,35 +2,43 @@ import sqlalchemy
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 from datetime import datetime, timezone
+from typing import Union
 
-import workspace_manager
+import config_paths
 from logger_config import setup_logging
 
+"""
+GOLD LAYER: FACT TABLE (ENERGY FORECAST)
+----------------------------------------
+Author: Aitor Asin
+Description: The "Heart" of the analytical model. Joins calculations, 
+             weather, and prices into a single, high-performance table.
+             Implements an incremental 'Upsert' strategy with a 2-hour window.
+"""
 
-logger  = setup_logging()
-DB_PATH = workspace_manager.get_db_path()
-
+logger = setup_logging()
 
 # ─────────────────────────────────────────────────────────────────────────────
-# BUILD
+# DATA ORCHESTRATION: FACT TABLE UPSERT
 # ─────────────────────────────────────────────────────────────────────────────
 
 def build_fact_energy_forecast(engine: sqlalchemy.engine.Engine) -> int:
     """
-    Incrementally upserts the Gold fact table by joining the active forecast
-    window (unix_time >= now - 2h) from clean_calculations with clean_weather
-    and clean_prices.  Returns the number of rows affected.
+    Consolidates energy metrics, weather conditions, and market prices.
+    Uses 'INSERT OR REPLACE' to maintain an idempotent pipeline.
     """
-    logger.info("[INIT] ── build_fact_energy_forecast starting ──────────────")
+    logger.info("[INIT] ── Rebuilding gold_fact_energy_forecast ──────────────")
 
+    # Incremental window: We process from 2 hours ago to the future
     buffer_seconds = 7200
-    start_unix     = int(datetime.now(timezone.utc).timestamp()) - buffer_seconds
+    start_unix = int(datetime.now(timezone.utc).timestamp()) - buffer_seconds
 
-    logger.info("[EXTRACT] Active window lower bound: unix_time >= %d (now - %ds)", start_unix, buffer_seconds)
+    logger.info("[EXTRACT] Processing window: unix_time >= %d", start_unix)
 
     try:
         with engine.begin() as conn:
-            # Ensure table exists with full schema
+            # 1. DDL: SCHEMA DEFINITION
+            # Client_id and unix_time form the composite primary key
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS gold_fact_energy_forecast (
                     client_id               TEXT    NOT NULL,
@@ -53,17 +61,20 @@ def build_fact_energy_forecast(engine: sqlalchemy.engine.Engine) -> int:
                 )
             """))
 
-            result = conn.execute(text("""
+            # 2. DML: CONSOLIDATED JOIN (Calculations + Weather + Prices)
+            # We use LEFT JOINs to ensure we don't lose records if weather/price 
+            # is missing for a specific slot.
+            query = text("""
                 INSERT OR REPLACE INTO gold_fact_energy_forecast
                 SELECT
-                    c.client_id,
-                    c.unix_time,
-                    c.forecast_time_utc,
-                    c.pv_power_gen_kw,
-                    c.pv_performance_ratio,
-                    c.poa_wm2,
-                    c.t_cell_celsius,
-                    c.power_con_kw,
+                    calc.client_id,
+                    calc.unix_time,
+                    calc.forecast_time_utc,
+                    calc.pv_power_gen_kw,
+                    calc.pv_performance_ratio,
+                    calc.poa_wm2,
+                    calc.t_cell_celsius,
+                    calc.power_con_kw,
                     w.temp_celsius,
                     w.humidity_pct,
                     w.clouds_pct,
@@ -72,19 +83,21 @@ def build_fact_energy_forecast(engine: sqlalchemy.engine.Engine) -> int:
                     w.weather_id,
                     pvpc.price_euro_mwh             AS price_pvpc_eur_mwh,
                     STRFTIME('%Y-%m-%d %H:%M:%S', 'now') AS _loaded_at_utc
-                FROM clean_calculations c
+                FROM clean_calculations calc
                 LEFT JOIN clean_weather w
-                    ON  w.client_id = c.client_id
-                    AND w.unix_time = c.unix_time
+                    ON  w.client_id = calc.client_id
+                    AND w.unix_time = calc.unix_time
                 LEFT JOIN clean_prices pvpc
-                    ON  pvpc.unix_time  = c.unix_time
+                    ON  pvpc.unix_time  = calc.unix_time
                     AND pvpc.price_type = 'PVPC'
-                WHERE c.unix_time >= :start_unix
-            """), {"start_unix": start_unix})
-
+                WHERE calc.unix_time >= :start_unix
+            """)
+            
+            result = conn.execute(query, {"start_unix": start_unix})
             rows_affected = result.rowcount
 
-            # Optimisation indexes — idempotent
+            # 3. PERFORMANCE: IDEMPOTENT INDEXING
+            # Crucial for fast filtering in Dashboards/PowerBI
             conn.execute(text(
                 "CREATE INDEX IF NOT EXISTS idx_gold_fact_unix_time  "
                 "ON gold_fact_energy_forecast (unix_time)"
@@ -94,37 +107,34 @@ def build_fact_energy_forecast(engine: sqlalchemy.engine.Engine) -> int:
                 "ON gold_fact_energy_forecast (weather_id)"
             ))
 
-        logger.info(
-            "[DONE] gold_fact_energy_forecast updated — rows upserted: %d (window start: %d)",
-            rows_affected, start_unix,
-        )
+        logger.info("[DONE] Upsert complete — Rows affected: %d", rows_affected)
         return rows_affected
 
     except SQLAlchemyError as exc:
-        logger.error("[ERROR] SQLAlchemy error in build_fact_energy_forecast: %s", exc)
+        logger.error("[ERROR] SQL Execution failure: %s", exc)
         raise
     except Exception as exc:
-        logger.error("[ERROR] Unexpected error in build_fact_energy_forecast: %s", exc)
+        logger.error("[ERROR] Unexpected error in fact table build: %s", exc)
         raise
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# ORCHESTRATOR ENTRY POINT
+# ENTRY POINT
 # ─────────────────────────────────────────────────────────────────────────────
 
-def load_fact_energy_forecast() -> int:
-    """Module entry point. Returns the number of rows upserted (0 on failure)."""
+def load_fact_energy_forecast() -> Union[int, bool]:
+    """
+    Main entry point for the fact table loader.
+    Ensures the DB engine is configured for modern SQLite features.
+    """
     try:
-        engine = create_engine(f"sqlite:///{DB_PATH}")
-        with engine.connect() as conn:
-            conn.execute(text("PRAGMA foreign_keys = ON"))
+        db_path = config_paths.get_db_path()
+        engine = create_engine(f"sqlite:///{db_path}")
         return build_fact_energy_forecast(engine)
     except Exception as exc:
-        logger.critical("[ERROR] Critical failure in load_fact_energy_forecast: %s", exc)
-        return 0
+        logger.critical("[ERROR] Fact table orchestrator failure: %s", exc)
+        return False
 
-
-# ─────────────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     load_fact_energy_forecast()

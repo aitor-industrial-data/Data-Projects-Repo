@@ -5,9 +5,17 @@ from sqlalchemy import create_engine, text
 import numpy as np
 from datetime import datetime, timezone
 
-import workspace_manager
+import config_paths
 from logger_config import setup_logging
 
+"""
+SILVER LAYER: CLIENT TRANSFORMATION
+-----------------------------------
+Author: Data Aitor Asin
+Description: Promotes client data from Bronze (Raw) to Silver (Cleaned).
+             Implements data type coercion, business rule validation,
+             deduplication, and null imputation for downstream analysis.
+"""
 
 logger = setup_logging()
 
@@ -133,7 +141,7 @@ def load_clients_to_silver(df: pd.DataFrame, table_name: str = "clean_clients") 
     Rebuilds the Silver client table from scratch and bulk-inserts the
     validated DataFrame.  client_id is enforced as PRIMARY KEY.
     """
-    db_path = workspace_manager.get_db_path()
+    db_path = config_paths.get_db_path()
 
     if df.empty:
         logger.warning("[LOAD] DataFrame is empty — nothing written to '%s'", table_name)
@@ -192,7 +200,7 @@ def transform_clients() -> int:
     """
     logger.info("[INIT] ── transform_clients starting ──────────────────────────")
 
-    bronze_dir    = workspace_manager.get_bronze_path()
+    bronze_dir    = config_paths.get_bronze_path()
     manifest_path = os.path.join(bronze_dir, "_process_manifest_clients.json")
 
     if not os.path.exists(manifest_path):
