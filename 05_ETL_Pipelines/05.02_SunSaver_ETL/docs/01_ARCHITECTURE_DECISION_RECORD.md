@@ -1,179 +1,179 @@
-# 01 — Architecture Decision Record (ADR)
-## SunSaver · Industrial Energy Intelligence Platform
-**Version:** 1.0.0 · **Status:** Active · **Author:** Aitor Asin · **Date:** 2025-05-10
+# 01 — Registro de Decisiones de Arquitectura (ADR)
+## SunSaver · Plataforma de Inteligencia Energética Industrial
+**Versión:** 1.0.0 · **Estado:** Activo · **Autor:** Aitor Asin · **Fecha:** 2025-05-10
 
-> *"This document is the single source of truth for every architectural decision made in the SunSaver platform. It exists to explain not just what was built, but why — and what was deliberately left behind."*
-
----
-
-## Table of Contents
-
-1. [Executive Summary](#1-executive-summary)
-2. [Context & Problem Statement](#2-context--problem-statement)
-3. [Architecture Overview](#3-architecture-overview)
-4. [Medallion Architecture Rationale](#4-medallion-architecture-rationale)
-5. [Technology Stack Decisions](#5-technology-stack-decisions)
-6. [ADR Log — Individual Decision Records](#6-adr-log--individual-decision-records)
-7. [Cross-Cutting Concerns](#7-cross-cutting-concerns)
-8. [Technical Roadmap](#8-technical-roadmap)
+> *"Este documento es la fuente única de verdad de cada decisión arquitectónica tomada en la plataforma SunSaver. Existe para explicar no solo qué se construyó, sino por qué — y qué se descartó deliberadamente."*
 
 ---
 
-## 1. Executive Summary
+## Tabla de Contenidos
 
-### 1.1 Objective of the System
+1. [Resumen Ejecutivo](#1-resumen-ejecutivo)
+2. [Contexto y Planteamiento del Problema](#2-contexto-y-planteamiento-del-problema)
+3. [Visión General de la Arquitectura](#3-visión-general-de-la-arquitectura)
+4. [Justificación de la Arquitectura Medallion](#4-justificación-de-la-arquitectura-medallion)
+5. [Decisiones sobre el Stack Tecnológico](#5-decisiones-sobre-el-stack-tecnológico)
+6. [Registro ADR — Decisiones Individuales de Arquitectura](#6-registro-adr--decisiones-individuales-de-arquitectura)
+7. [Preocupaciones Transversales](#7-preocupaciones-transversales)
+8. [Hoja de Ruta Técnica](#8-hoja-de-ruta-técnica)
 
-SunSaver is an **industrial energy intelligence platform** designed to provide SMEs with photovoltaic installations the operational data required to make evidence-based energy management decisions.
+---
 
-The system ingests heterogeneous external data (Spanish electricity market prices via REE API, atmospheric forecasts via OpenWeatherMap), applies a validated chain of photovoltaic physics models, and delivers a 5-day forward-looking energy forecast with hourly granularity — covering solar generation, industrial consumption, and real-time electricity prices.
+## 1. Resumen Ejecutivo
 
-The primary output is a **Gold-layer star schema** optimised for analytical consumption: every row in `gold_fact_energy_forecast` answers the question *"for this client, at this hour, how much energy will be generated, how much will be consumed, and what will it cost?"*. This structured intelligence enables actionable decisions on flexible load management: battery charging schedules, machinery start-up windows, and peak-demand avoidance.
+### 1.1 Objetivo del Sistema
 
-### 1.2 Scope and Domain
+SunSaver es una **plataforma de inteligencia energética industrial** diseñada para proporcionar a las PYMES con instalaciones fotovoltaicas los datos operativos necesarios para tomar decisiones de gestión energética basadas en evidencia.
 
-The system operates at the intersection of two domains:
+El sistema ingesta datos externos heterogéneos (precios del mercado eléctrico español vía API de REE, previsiones atmosféricas vía OpenWeatherMap), aplica una cadena validada de modelos de física fotovoltaica, y entrega una previsión energética de 5 días con granularidad horaria — cubriendo generación solar, consumo industrial y precios de electricidad en tiempo real.
 
-**Physical domain — Photovoltaic generation modelling:**
-The platform implements a full atmospheric-to-electrical physics chain: solar geometry (NREL SPA via pvlib), clear-sky irradiance (Haurwitz model), cloud attenuation (Kasten-Czeplak), irradiance decomposition (Erbs model), plane-of-array projection (Liu-Jordan isotropic + albedo), cell temperature modelling (Faiman model), and AC power output with thermal derating (−0.4 %/°C for crystalline silicon).
+El producto final es un **esquema en estrella en la capa Gold** optimizado para consumo analítico: cada fila de `gold_fact_energy_forecast` responde a la pregunta *"para este cliente, en esta hora, ¿cuánta energía se generará, cuánta se consumirá y cuánto costará?"*. Esta inteligencia estructurada permite tomar decisiones accionables sobre la gestión de cargas flexibles: programas de carga de baterías, ventanas óptimas de arranque de maquinaria y evitación de picos de demanda.
 
-**Economic domain — Spanish electricity market:**
-The platform integrates with the Red Eléctrica de España (REE) public API to ingest PVPC (Precio Voluntario para el Pequeño Consumidor) tariff prices and classifies each hourly slot against the 2.0TD tariff schedule (P1 Punta / P2 Llano / P3 Valle / P6 Super-Valle), enabling cost-optimal scheduling of flexible industrial loads.
+### 1.2 Alcance y Dominio
 
-**Temporal scope:** 5-day meteorological forecast horizon (OpenWeatherMap 3-hourly → upsampled to 1-hourly) and next-day electricity price forecast (REE publishes D+1 after 20:30 CET).
+El sistema opera en la intersección de dos dominios:
 
-**Client scope:** Multi-client architecture; each client is independently characterised by geographic coordinates, PV system parameters (peak power, panel area, tilt angle, azimuth, system losses, mounting type), battery storage configuration, and industrial load profile.
+**Dominio físico — Modelado de generación fotovoltaica:**
+La plataforma implementa una cadena física completa de atmósfera a electricidad: geometría solar (NREL SPA vía pvlib), irradiancia de cielo despejado (modelo Haurwitz), atenuación por nubes (Kasten-Czeplak), descomposición de irradiancia (modelo de Erbs), proyección en el plano del array (Liu-Jordan isotrópico + albedo), modelado de temperatura de célula (modelo de Faiman) y potencia AC de salida con derating térmico (−0,4 %/°C para silicio cristalino).
 
-### 1.3 Stakeholders and Technical Audience
+**Dominio económico — Mercado eléctrico español:**
+La plataforma se integra con la API pública de Red Eléctrica de España (REE) para ingestar los precios de la tarifa PVPC (Precio Voluntario para el Pequeño Consumidor) y clasifica cada franja horaria según el esquema tarifario 2.0TD (P1 Punta / P2 Llano / P3 Valle / P6 Super-Valle), habilitando la programación óptima en costes de cargas industriales flexibles.
 
-| Stakeholder | Role | Primary Concern |
+**Alcance temporal:** Horizonte de previsión meteorológica de 5 días (OpenWeatherMap 3 horas → remuestreado a 1 hora) y previsión de precios de electricidad del día siguiente (REE publica D+1 después de las 20:30 CET).
+
+**Alcance de clientes:** Arquitectura multi-cliente; cada cliente se caracteriza de forma independiente por coordenadas geográficas, parámetros del sistema FV (potencia pico, área de panel, ángulo de inclinación, azimut, pérdidas del sistema, tipo de montaje), configuración de almacenamiento en batería y perfil de carga industrial.
+
+### 1.3 Partes Interesadas y Audiencia Técnica
+
+| Parte interesada | Rol | Preocupación principal |
 |---|---|---|
-| Industrial Plant Manager | Primary consumer | Operational decisions: when to charge batteries, when to run heavy machinery |
-| Energy Manager / Facility Engineer | Secondary consumer | KPI monitoring, cost optimisation, SLA verification |
-| Data Engineer (maintainer) | System owner | Pipeline reliability, data quality, schema evolution |
-| Senior Technical Recruiter | Document reader | Architecture quality, engineering judgment, professional standards |
-| Future MLOps Engineer | Downstream | Feature store readiness, model training data availability |
+| Responsable de Planta Industrial | Consumidor primario | Decisiones operativas: cuándo cargar baterías, cuándo arrancar maquinaria pesada |
+| Energy Manager / Técnico de Instalaciones | Consumidor secundario | Monitorización de KPIs, optimización de costes, verificación de SLA |
+| Ingeniero de Datos (mantenedor) | Propietario del sistema | Fiabilidad del pipeline, calidad del dato, evolución del esquema |
+| Reclutador Técnico Senior | Lector del documento | Calidad arquitectónica, criterio de ingeniería, estándares profesionales |
+| Futuro Ingeniero MLOps | Downstream | Disponibilidad del feature store, datos de entrenamiento de modelos |
 
 ---
 
-## 2. Context & Problem Statement
+## 2. Contexto y Planteamiento del Problema
 
-### 2.1 Business Problem
+### 2.1 Problema de Negocio
 
-Spanish industrial SMEs with photovoltaic installations face a persistent operational challenge: **they generate energy but cannot precisely predict when, how much, or at what market value**. This creates three compounding inefficiencies:
+Las PYMES industriales españolas con instalaciones fotovoltaicas se enfrentan a un reto operativo persistente: **generan energía pero no pueden predecir con precisión cuándo, cuánta ni a qué valor de mercado**. Esto genera tres ineficiencias compuestas:
 
-**Inefficiency 1 — Blind flexible load scheduling.** Battery charging, EV fleets, industrial HVAC, and non-time-critical machinery are started based on intuition or fixed schedules rather than real-time generation forecasts. The result is systematic energy waste: loads run during peak price windows (P1, P2) when solar generation is insufficient, incurring avoidable grid costs.
+**Ineficiencia 1 — Programación ciega de cargas flexibles.** La carga de baterías, flotas de vehículos eléctricos, climatización industrial (HVAC) y maquinaria no crítica en el tiempo se arrancan basándose en la intuición o en horarios fijos, en lugar de en previsiones reales de generación. El resultado es un despilfarro energético sistemático: las cargas funcionan durante ventanas de precio pico (P1, P2) cuando la generación solar es insuficiente, incurriendo en costes de red evitables.
 
-**Inefficiency 2 — Missed self-consumption windows.** Without an hourly generation forecast correlated against consumption profiles, facilities cannot identify the hours where net energy balance is positive — i.e., when they can run loads entirely on solar without grid draw.
+**Ineficiencia 2 — Ventanas de autoconsumo desaprovechadas.** Sin una previsión de generación horaria correlacionada con los perfiles de consumo, las instalaciones no pueden identificar las horas en que el balance energético neto es positivo — es decir, cuando pueden funcionar cargas enteramente con solar sin tirar de red.
 
-**Inefficiency 3 — Reactive, not predictive, energy management.** Current tools in the SME market provide historical consumption data (rear-view mirror) but not forward-looking physics-based generation estimates correlated with market prices (windshield). SunSaver addresses this gap.
+**Ineficiencia 3 — Gestión energética reactiva, no predictiva.** Las herramientas actuales disponibles para PYMES proporcionan datos históricos de consumo (espejo retrovisor) pero no estimaciones de generación basadas en física hacia el futuro, correlacionadas con precios de mercado (parabrisas). SunSaver aborda este vacío.
 
-### 2.2 Key Functional Requirements
+### 2.2 Requisitos Funcionales Clave
 
-| ID | Requirement | Priority |
+| ID | Requisito | Prioridad |
 |---|---|---|
-| FR-01 | Ingest next-day electricity prices from REE API with graceful handling of pre-20:30 unavailability | Critical |
-| FR-02 | Ingest 5-day weather forecast per client from OpenWeatherMap, independently per client (failure isolation) | Critical |
-| FR-03 | Apply validated PV physics chain to produce hourly AC power generation estimates | Critical |
-| FR-04 | Model industrial consumption using shift-schedule profiles with HVAC thermal sensitivity | High |
-| FR-05 | Classify each hourly slot against Spanish 2.0TD tariff periods (P1–P6) | High |
-| FR-06 | Support multiple clients simultaneously with independent parametrisation | High |
-| FR-07 | Deliver a unified analytical fact table joinable by time, client, weather, and price dimensions | High |
-| FR-08 | Provide full pipeline audit trail with per-execution telemetry | Medium |
-| FR-09 | Support incremental pipeline execution (resume from any stage) | Medium |
-| FR-10 | Preserve raw ingested data as immutable Bronze layer for auditability and reprocessing | Medium |
+| RF-01 | Ingestar precios de electricidad del día siguiente desde la API de REE con gestión elegante de la indisponibilidad previa a las 20:30 | Crítico |
+| RF-02 | Ingestar previsión meteorológica de 5 días por cliente desde OpenWeatherMap, de forma independiente por cliente (aislamiento de fallos) | Crítico |
+| RF-03 | Aplicar cadena de física FV validada para producir estimaciones horarias de potencia AC generada | Crítico |
+| RF-04 | Modelar el consumo industrial mediante perfiles de turnos con sensibilidad térmica del HVAC | Alto |
+| RF-05 | Clasificar cada franja horaria según los períodos tarifarios 2.0TD españoles (P1–P6) | Alto |
+| RF-06 | Dar soporte a múltiples clientes simultáneamente con parametrización independiente | Alto |
+| RF-07 | Entregar una tabla de hechos analítica unificada con joins por tiempo, cliente, meteorología y precio | Alto |
+| RF-08 | Proporcionar trazabilidad completa del pipeline con telemetría por ejecución | Medio |
+| RF-09 | Soportar ejecución incremental del pipeline (reanudar desde cualquier etapa) | Medio |
+| RF-10 | Preservar los datos brutos ingestados como capa Bronze inmutable para auditoría y reprocesamiento | Medio |
 
-### 2.3 Non-Functional Requirements
+### 2.3 Requisitos No Funcionales
 
-**Latency:** The pipeline is designed for scheduled batch execution (daily cadence), not real-time streaming. End-to-end pipeline execution is expected to complete within 120 seconds for up to 20 clients on commodity on-premise hardware. The observed execution time in production is approximately 1.93 seconds for the current client set (11 steps, 1,386 rows — as evidenced in the terminal output).
+**Latencia:** El pipeline está diseñado para ejecución batch programada (cadencia diaria), no para streaming en tiempo real. Se espera que la ejecución completa del pipeline finalice en menos de 120 segundos para hasta 20 clientes en hardware on-premise estándar. El tiempo de ejecución observado en producción es de aproximadamente 1,93 segundos para el conjunto de clientes actual (11 pasos, 1.386 filas — evidenciado en la salida del terminal).
 
-**Scalability:** The architecture must support horizontal scaling of the client dimension (from 1 to ~100 clients) without schema changes. The multi-client loop pattern in `bronze_ingest_weather_owm.py` and the composite primary key `(client_id, unix_time)` in all Silver and Gold tables are specifically designed for this.
+**Escalabilidad:** La arquitectura debe soportar escalado horizontal de la dimensión cliente (de 1 a ~100 clientes) sin cambios de esquema. El patrón de bucle multi-cliente en `bronze_ingest_weather_owm.py` y la clave primaria compuesta `(client_id, unix_time)` en todas las tablas Silver y Gold están específicamente diseñados para esto.
 
-**Availability:** As an on-premise daily batch system, 99.5 % daily execution success is the target SLA. The pipeline implements stage-gate abort logic: if all steps within a stage fail, execution halts to prevent corrupt data propagation. Individual step failures within a stage are tolerated (partial success state).
+**Disponibilidad:** Como sistema batch diario on-premise, el objetivo de SLA es un 99,5 % de éxito de ejecución diaria. El pipeline implementa lógica de aborte por etapa: si todos los pasos de una etapa fallan, la ejecución se detiene para evitar la propagación de datos corruptos. Los fallos individuales de pasos dentro de una etapa se toleran (estado de éxito parcial).
 
-**Data Quality:** The Silver layer enforces strict data contracts: coordinate validation, physical constant range clipping, outlier filtering (price series: [−100, 2000] €/MWh), and null imputation with physics-informed defaults (tilt angle: 30°, azimuth: 180° South, system losses: 14 %, efficiency: 15 %).
+**Calidad del dato:** La capa Silver aplica contratos de datos estrictos: validación de coordenadas, recorte de rangos de constantes físicas, filtrado de outliers (serie de precios: [−100, 2.000] €/MWh) e imputación de nulos con valores por defecto informados por la física (ángulo de inclinación: 30°, azimut: 180° Sur, pérdidas del sistema: 14 %, eficiencia: 15 %).
 
-**Idempotency:** All Silver and Gold load operations use `INSERT OR REPLACE` with composite natural keys. The pipeline can be re-run at any point without producing duplicate records or corrupting historical data.
+**Idempotencia:** Todas las operaciones de escritura en Silver y Gold usan `INSERT OR REPLACE` con claves naturales compuestas. El pipeline puede re-ejecutarse en cualquier momento sin producir registros duplicados ni corromper datos históricos.
 
-**Reproducibility:** Bronze layer files are written with `chmod 444` (read-only, immutable) at the moment of ingestion. This ensures that any historical pipeline run can be reproduced by replaying Bronze files through the Silver and Gold layers.
+**Reproducibilidad:** Los archivos de la capa Bronze se escriben con `chmod 444` (solo lectura, inmutables) en el momento de la ingesta. Esto garantiza que cualquier ejecución histórica del pipeline pueda reproducirse reproduciendo los archivos Bronze a través de las capas Silver y Gold.
 
-### 2.4 Constraints and Assumptions
+### 2.4 Restricciones y Asunciones
 
-**Constraints:**
-- Deployment environment is on-premise Linux (Ubuntu 24). No Kubernetes, no container orchestration, no cloud object storage.
-- No proprietary data warehouse (no Snowflake, no BigQuery, no Redshift). Storage must be file-based or embedded relational.
-- REE API is a public endpoint with no authentication; it is subject to availability windows (prices published after 20:30 CET for D+1). The system must handle graceful degradation when the endpoint returns no data.
-- OpenWeatherMap requires a valid API key injected via environment variable (`WEATHER_API_KEY`). The free tier provides 5-day / 3-hourly forecasts.
-- The physics engine requires `pvlib` (NREL's validated Python PV library) and `numpy`. These are the only computationally intensive dependencies.
+**Restricciones:**
+- El entorno de despliegue es Linux on-premise (Ubuntu 24). Sin Kubernetes, sin orquestación de contenedores, sin almacenamiento de objetos en cloud.
+- Sin almacén de datos propietario (sin Snowflake, BigQuery ni Redshift). El almacenamiento debe ser basado en ficheros o relacional embebido.
+- La API de REE es un endpoint público sin autenticación; está sujeta a ventanas de disponibilidad (precios publicados después de las 20:30 CET para D+1). El sistema debe manejar la degradación elegante cuando el endpoint no devuelve datos.
+- OpenWeatherMap requiere una clave API válida inyectada vía variable de entorno (`WEATHER_API_KEY`). El plan gratuito proporciona previsiones de 5 días con intervalos de 3 horas.
+- El motor de física requiere `pvlib` (biblioteca Python de modelado FV validada por NREL) y `numpy`. Estas son las únicas dependencias computacionalmente intensivas.
 
-**Assumptions:**
-- Client PV system parameters (peak power, tilt, azimuth, losses) are provided via a master Excel file (`clients_source.xlsx`) and are relatively stable (updated infrequently).
-- Industrial consumption profiles are modelled synthetically using a parameterised shift-schedule model. Real SCADA integration is out of scope for v1.0 but is a defined roadmap item.
-- The platform operates in the Spanish electricity market context (REE, 2.0TD tariff, Europe/Madrid timezone). Internationalisation is a v2.0 concern.
-- SQLite is the appropriate storage backend for the current scale. Migration to PostgreSQL or a columnar store (DuckDB) is a documented roadmap item with a defined trigger criterion (>50 clients or >500K rows in the fact table).
+**Asunciones:**
+- Los parámetros del sistema FV de cada cliente (potencia pico, inclinación, azimut, pérdidas) se proporcionan mediante un archivo Excel maestro (`clients_source.xlsx`) y son relativamente estables (actualizados con poca frecuencia).
+- Los perfiles de consumo industrial se modelan de forma sintética usando un modelo paramétrico de turnos. La integración real con SCADA está fuera del alcance de v1.0 pero es un elemento definido en la hoja de ruta.
+- La plataforma opera en el contexto del mercado eléctrico español (REE, tarifa 2.0TD, zona horaria Europe/Madrid). La internacionalización es una preocupación de v2.0.
+- SQLite es el backend de almacenamiento adecuado para la escala actual. La migración a PostgreSQL o a un almacén columnar (DuckDB) es un elemento documentado en la hoja de ruta con un criterio de activación definido (>50 clientes o >500K filas en la tabla de hechos).
 
 ---
 
-## 3. Architecture Overview
+## 3. Visión General de la Arquitectura
 
-### 3.1 High-Level Diagram — C4 Level 1: System Context
+### 3.1 Diagrama de Alto Nivel — C4 Nivel 1: Contexto del Sistema
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                         EXTERNAL SYSTEMS                            │
+│                        SISTEMAS EXTERNOS                            │
 │                                                                     │
 │  ┌──────────────────┐     ┌──────────────────┐                     │
-│  │   REE API        │     │  OpenWeatherMap   │                     │
-│  │  (PVPC Prices)   │     │  Forecast API     │                     │
+│  │   API REE        │     │  OpenWeatherMap   │                     │
+│  │  (Precios PVPC)  │     │  API de Previsión │                     │
 │  │  apidatos.ree.es │     │  api.openweather. │                     │
 │  └────────┬─────────┘     └────────┬──────────┘                    │
 └───────────┼──────────────────────────┼──────────────────────────────┘
             │  JSON/REST               │  JSON/REST
             ▼                          ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│                      SUNSAVER PLATFORM                              │
+│                       PLATAFORMA SUNSAVER                           │
 │                                                                     │
 │  ┌───────────────────────────────────────────────────────────────┐  │
-│  │                    ETL PIPELINE (Python)                      │  │
-│  │   Bronze Ingest → Silver Transform → Gold Build               │  │
+│  │             PIPELINE ETL (Python)                             │  │
+│  │  Ingesta Bronze → Transformación Silver → Construcción Gold   │  │
 │  └──────────────────────────┬────────────────────────────────────┘  │
 │                             │                                       │
 │  ┌──────────────────────────▼────────────────────────────────────┐  │
-│  │                    SQLite DATABASE                            │  │
-│  │           sunsaver.db  (Silver + Gold layers)                 │  │
+│  │                  BASE DE DATOS SQLite                         │  │
+│  │           sunsaver.db  (capas Silver + Gold)                  │  │
 │  └──────────────────────────┬────────────────────────────────────┘  │
 │                             │                                       │
 │  ┌──────────────────────────▼────────────────────────────────────┐  │
-│  │               ANALYTICAL CONSUMERS (future)                   │  │
-│  │         Power BI · Custom Dashboard · REST API                │  │
+│  │           CONSUMIDORES ANALÍTICOS (futuro)                    │  │
+│  │       Power BI · Dashboard Personalizado · API REST           │  │
 │  └───────────────────────────────────────────────────────────────┘  │
 │                                                                     │
 │  ┌───────────────────────────────────────────────────────────────┐  │
-│  │                  DATA SOURCE (internal)                       │  │
-│  │           clients_source.xlsx  (client master data)          │  │
+│  │                FUENTE DE DATOS (interna)                      │  │
+│  │        clients_source.xlsx  (datos maestros de clientes)      │  │
 │  └───────────────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-### 3.2 Component Diagram — C4 Level 2: Container View
+### 3.2 Diagrama de Componentes — C4 Nivel 2: Vista de Contenedores
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────────┐
-│                             SUNSAVER PIPELINE CONTAINER                          │
+│                        CONTENEDOR: PIPELINE SUNSAVER                             │
 │                                                                                  │
 │  ┌─────────────────────────────────────────────────────────────────────────────┐ │
-│  │  pipeline_runner.py  ← ORCHESTRATOR (Stage-gate, Audit, CLI)               │ │
+│  │  pipeline_runner.py  ← ORQUESTADOR (Stage-gate, Auditoría, CLI)            │ │
 │  └───────┬─────────────────────────────────────────────────────────────────────┘ │
 │          │                                                                       │
 │    ┌─────▼──────────────────────────────────────────────────────────────────┐   │
-│    │  STAGE 1 — BRONZE EXTRACTION (Parallel-safe, manifest-driven)         │   │
+│    │  ETAPA 1 — EXTRACCIÓN BRONZE (Segura en paralelo, basada en manifiestos)│   │
 │    │  ┌─────────────────────┐  ┌──────────────────────┐                    │   │
 │    │  │bronze_ingest_clients│  │bronze_ingest_prices  │                    │   │
-│    │  │ Excel → JSON (444)  │  │ REE API → JSON (444) │                    │   │
+│    │  │ Excel → JSON (444)  │  │ API REE → JSON (444) │                    │   │
 │    │  └─────────────────────┘  └──────────────────────┘                    │   │
 │    └───────────────────────────────────────────────────────────────────────┘   │
 │          │                                                                       │
 │    ┌─────▼──────────────────────────────────────────────────────────────────┐   │
-│    │  STAGE 2 — SILVER TRANSFORMATION (Manifest-driven, idempotent)        │   │
+│    │  ETAPA 2 — TRANSFORMACIÓN SILVER (Basada en manifiestos, idempotente)  │   │
 │    │  ┌──────────────────────┐  ┌──────────────────────┐                   │   │
 │    │  │silver_transform_     │  │silver_transform_     │                   │   │
 │    │  │clients               │  │prices                │                   │   │
@@ -182,514 +182,514 @@ Spanish industrial SMEs with photovoltaic installations face a persistent operat
 │    └───────────────────────────────────────────────────────────────────────┘   │
 │          │                                                                       │
 │    ┌─────▼──────────────────────────────────────────────────────────────────┐   │
-│    │  STAGE 3 — WEATHER BRONZE (Coord-driven loop, fault-isolated)         │   │
+│    │  ETAPA 3 — WEATHER BRONZE (Bucle por coordenadas, fallos aislados)     │   │
 │    │  ┌─────────────────────────────────────────────────────────────────┐  │   │
-│    │  │ bronze_ingest_weather_owm  (reads clean_clients for coords)     │  │   │
-│    │  │ OWM API → JSON per client (444)                                 │  │   │
+│    │  │ bronze_ingest_weather_owm  (lee clean_clients para coordenadas) │  │   │
+│    │  │ API OWM → JSON por cliente (444)                                │  │   │
 │    │  └─────────────────────────────────────────────────────────────────┘  │   │
 │    └───────────────────────────────────────────────────────────────────────┘   │
 │          │                                                                       │
 │    ┌─────▼──────────────────────────────────────────────────────────────────┐   │
-│    │  STAGE 4 — WEATHER SILVER (3h→1h resampling, feature engineering)    │   │
+│    │  ETAPA 4 — WEATHER SILVER (Remuestreo 3h→1h, ingeniería de atributos) │   │
 │    │  ┌─────────────────────────────────────────────────────────────────┐  │   │
 │    │  │ silver_transform_weather → clean_weather                        │  │   │
 │    │  └─────────────────────────────────────────────────────────────────┘  │   │
 │    └───────────────────────────────────────────────────────────────────────┘   │
 │          │                                                                       │
 │    ┌─────▼──────────────────────────────────────────────────────────────────┐   │
-│    │  STAGE 5 — PV PHYSICS ENGINE (Row-level simulation, vectorised)      │   │
+│    │  ETAPA 5 — MOTOR DE FÍSICA FV (Simulación por fila, vectorizada)      │   │
 │    │  ┌───────────────────────┐    ┌───────────────────────────────────┐  │   │
 │    │  │silver_calc_pv_        │───►│ engine_pv_physics.py             │  │   │
-│    │  │generation             │    │ Solar Pos → GHI → DNI/DHI →      │  │   │
-│    │  │ → clean_calculations  │    │ POA → Faiman → P_AC + P_load     │  │   │
+│    │  │generation             │    │ Pos. Solar → GHI → DNI/DHI →    │  │   │
+│    │  │ → clean_calculations  │    │ POA → Faiman → P_AC + P_carga   │  │   │
 │    │  └───────────────────────┘    └───────────────────────────────────┘  │   │
 │    └───────────────────────────────────────────────────────────────────────┘   │
 │          │                                                                       │
 │    ┌─────▼──────────────────────────────────────────────────────────────────┐   │
-│    │  STAGE 6 — GOLD LAYER (Star schema, atomic rebuild)                  │   │
+│    │  ETAPA 6 — CAPA GOLD (Esquema en estrella, reconstrucción atómica)    │   │
 │    │  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌────────────┐  │   │
 │    │  │dim_client    │ │dim_datetime  │ │dim_weather   │ │fact_energy │  │   │
-│    │  │(has_solar,   │ │(2.0TD tariff,│ │(modal desc.  │ │_forecast   │  │   │
-│    │  │ has_battery) │ │ festivos)    │ │ per ID)      │ │(multi-JOIN)│  │   │
+│    │  │(has_solar,   │ │(tarifa 2.0TD,│ │(desc. modal  │ │_forecast   │  │   │
+│    │  │ has_battery) │ │ festivos)    │ │ por ID)      │ │(multi-JOIN)│  │   │
 │    │  └──────────────┘ └──────────────┘ └──────────────┘ └────────────┘  │   │
 │    └───────────────────────────────────────────────────────────────────────┘   │
 │                                                                                  │
 │  ┌─────────────────────────────────────────────────────────────────────────────┐ │
-│  │  CROSS-CUTTING: config_paths.py · logger_config.py · audit_metadata.py    │ │
+│  │  TRANSVERSALES: config_paths.py · logger_config.py · audit_metadata.py    │ │
 │  └─────────────────────────────────────────────────────────────────────────────┘ │
 └──────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Filesystem layout (on-premise):**
+**Estructura de ficheros (on-premise):**
 ```
 project_root/
 ├── data/
-│   ├── bronze/                  ← Immutable raw files (chmod 444)
+│   ├── bronze/                  ← Ficheros brutos inmutables (chmod 444)
 │   │   ├── clients_YYYYMMDD_HHMMSS.json
 │   │   ├── prices_YYYYMMDD_HHMMSS.json
 │   │   ├── weather_{client_id}_YYYYMMDD_HHMMSS.json
-│   │   ├── _process_manifest_clients.json     ← Process control
+│   │   ├── _process_manifest_clients.json     ← Control de procesos
 │   │   ├── _process_manifest_ree.json
 │   │   └── _process_manifest_openweather.json
 │   ├── sunsaver.db              ← Silver + Gold (SQLite)
-│   └── clients_source.xlsx      ← Client master data
+│   └── clients_source.xlsx      ← Datos maestros de clientes
 ├── logs/
-│   └── sunsaver_YYYY-MM-DD.log  ← Daily rotating logs
-└── src/                         ← Pipeline scripts
+│   └── sunsaver_YYYY-MM-DD.log  ← Logs con rotación diaria
+└── src/                         ← Scripts del pipeline
 ```
 
-### 3.3 Adopted Design Principles
+### 3.3 Principios de Diseño Adoptados
 
-**Single Responsibility Principle (SRP):** Each module has exactly one responsibility. `engine_pv_physics.py` does physics — it has no I/O. `config_paths.py` resolves paths — it has no business logic. This separation makes unit testing, replacement, and debugging deterministic.
+**Principio de Responsabilidad Única (SRP):** Cada módulo tiene exactamente una responsabilidad. `engine_pv_physics.py` hace física — no tiene E/S. `config_paths.py` resuelve rutas — no tiene lógica de negocio. Esta separación hace que los tests unitarios, el reemplazo y la depuración sean deterministas.
 
-**Immutability at ingestion (Bronze Seal):** Raw data is never modified after write. Files are sealed with `chmod 444`. This is the data engineering equivalent of write-once-read-many (WORM) storage, enabling full reprocessing from source at any time.
+**Inmutabilidad en la ingesta (Sellado Bronze):** Los datos brutos nunca se modifican tras la escritura. Los ficheros se sellan con `chmod 444`. Es el equivalente en ingeniería de datos del almacenamiento WORM (write-once-read-many), permitiendo el reprocesamiento completo desde la fuente en cualquier momento.
 
-**Idempotency at every write boundary:** All Silver and Gold writes use `INSERT OR REPLACE` with natural composite keys. Running the pipeline twice produces identical results — no duplicates, no drift.
+**Idempotencia en cada frontera de escritura:** Todas las escrituras en Silver y Gold usan `INSERT OR REPLACE` con claves naturales compuestas. Ejecutar el pipeline dos veces produce resultados idénticos — sin duplicados, sin deriva.
 
-**Manifest-driven flow control:** Bronze-to-Silver promotion is governed by process manifests (JSON control files per data source). This decouples ingestion timing from transformation timing and provides a built-in retry mechanism for failed tasks (status: `error` → re-queued on next run).
+**Control de flujo basado en manifiestos:** La promoción de Bronze a Silver está gobernada por manifiestos de proceso (ficheros JSON de control por fuente de datos). Esto desacopla el timing de la ingesta del de la transformación y proporciona un mecanismo de reintento integrado para tareas fallidas (estado `error` → vuelve a encolarse en la siguiente ejecución).
 
-**Fail-fast with graceful degradation:** The orchestrator implements stage-gate logic — if an entire stage fails, the pipeline aborts before corrupting downstream layers. Within a stage, individual step failures are tolerated and logged (PARTIAL SUCCESS state).
+**Fallo rápido con degradación elegante:** El orquestador implementa lógica de aborte por etapa — si una etapa completa falla, el pipeline aborta antes de que las etapas posteriores se ejecuten con datos de entrada corruptos. Dentro de una etapa, los fallos individuales de pasos se toleran y se registran (estado de ÉXITO PARCIAL).
 
-**Physics-first data modelling:** All simulation parameters use validated scientific models (pvlib, Erbs, Faiman). Empirical constants (cloud attenuation, transmittance factors) are documented inline with their academic sources. The physics engine is designed to short-circuit safely when inputs are physically impossible (solar elevation < 2° → zero output).
+**Modelado de datos orientado a la física:** Todos los parámetros de simulación usan modelos científicos validados (pvlib, Erbs, Faiman). Las constantes empíricas (atenuación por nubes, factores de transmitancia) están documentadas en línea con sus fuentes académicas. El motor de física está diseñado para cortocircuitar de forma segura cuando los inputs son físicamente imposibles (elevación solar < 2° → salida cero).
 
 ---
 
-## 4. Medallion Architecture Rationale
+## 4. Justificación de la Arquitectura Medallion
 
-### 4.1 Why Bronze / Silver / Gold
+### 4.1 Por qué Bronze / Silver / Gold
 
-The Medallion Architecture (also known as the Delta Lake pattern, popularised by Databricks) was selected as the foundational data organisation paradigm. The decision was not driven by trend adoption but by a specific requirement: **the need to independently version, reprocess, and audit each transformation stage without losing the ability to trace any output value back to its raw source.**
+La Arquitectura Medallion (también conocida como patrón Delta Lake, popularizada por Databricks) fue seleccionada como paradigma fundamental de organización del dato. La decisión no estuvo motivada por seguir una tendencia sino por un requisito específico: **la necesidad de versionar, reprocesar y auditar de forma independiente cada etapa de transformación sin perder la capacidad de trazar cualquier valor de salida hasta su fuente bruta.**
 
-In the industrial energy management domain, this is non-negotiable. If a client's generation forecast is incorrect, the investigation path must be deterministic: raw API response → parsed values → physics model inputs → computed output. The three-layer architecture provides this traceability natively.
+En el dominio de la gestión energética industrial, esto no es negociable. Si la previsión de generación de un cliente es incorrecta, el camino de investigación debe ser determinista: respuesta bruta de la API → valores parseados → inputs del modelo de física → salida calculada. La arquitectura de tres capas proporciona esta trazabilidad de forma nativa.
 
-**Bronze (Raw Ingestion Layer):**
-- Contains the verbatim API responses and source file contents, stored as timestamped JSON files.
-- Files are sealed (chmod 444) at write time — they cannot be modified, only read.
-- Acts as a persistent audit log and a full reprocessing source.
-- No business logic is applied at this layer. Raw data includes NaN values, inconsistent types, and partial records.
+**Bronze (Capa de Ingesta Bruta):**
+- Contiene las respuestas literales de las APIs y el contenido del fichero fuente, almacenados como ficheros JSON con marca temporal.
+- Los ficheros se sellan (chmod 444) en el momento de la escritura — no pueden modificarse, solo leerse.
+- Actúa como registro de auditoría persistente y fuente completa de reprocesamiento.
+- No se aplica lógica de negocio en esta capa. Los datos brutos incluyen valores NaN, tipos inconsistentes y registros parciales.
 
-**Silver (Refined / Cleaned Layer):**
-- Contains validated, typed, deduplicated, and business-rule-enforced data in SQLite tables.
-- Serves as the authoritative join surface: `clean_clients`, `clean_prices`, `clean_weather`, `clean_calculations`.
-- Data at this layer satisfies a defined schema contract (NOT NULL constraints, primary keys, physical range checks).
-- The physics simulation runs at this layer, producing `clean_calculations` as the primary derived dataset.
+**Silver (Capa Refinada / Limpia):**
+- Contiene datos validados, tipados, deduplicados y con reglas de negocio aplicadas en tablas SQLite.
+- Sirve como superficie de join autoritativa: `clean_clients`, `clean_prices`, `clean_weather`, `clean_calculations`.
+- Los datos en esta capa satisfacen un contrato de esquema definido (restricciones NOT NULL, claves primarias, validaciones de rango físico).
+- La simulación de física se ejecuta en esta capa, produciendo `clean_calculations` como el conjunto de datos derivado principal.
 
-**Gold (Analytical / Serving Layer):**
-- Contains the star schema optimised for analytical consumption.
-- `gold_fact_energy_forecast` is the denormalised fact table that joins all dimensions; it is the primary output of the platform and the direct input for dashboards and decision-support tools.
-- All dimensional tables (`gold_dim_client`, `gold_dim_datetime`, `gold_dim_weather`) are atomically rebuilt on each pipeline run.
-- Indexes on `unix_time` and `weather_id` ensure sub-second query response for dashboard queries.
+**Gold (Capa Analítica / de Servicio):**
+- Contiene el esquema en estrella optimizado para consumo analítico.
+- `gold_fact_energy_forecast` es la tabla de hechos desnormalizada que une todas las dimensiones; es el producto principal de la plataforma y el input directo para cuadros de mando y herramientas de apoyo a la decisión.
+- Todas las tablas dimensionales (`gold_dim_client`, `gold_dim_datetime`, `gold_dim_weather`) se reconstruyen atómicamente en cada ejecución del pipeline.
+- Los índices sobre `unix_time` y `weather_id` garantizan respuestas sub-segundo en las consultas de los dashboards.
 
-### 4.2 Promotion Criteria Between Layers
+### 4.2 Criterios de Promoción entre Capas
 
-A record is promoted from Bronze to Silver when it satisfies all of the following:
+Un registro se promueve de Bronze a Silver cuando satisface todos los criterios siguientes:
 
-| Criterion | Validation applied |
+| Criterio | Validación aplicada |
 |---|---|
-| Schema completeness | Critical fields (`client_id`, `latitude`, `longitude`, `pv_peak_power_kw`) are non-null |
-| Type validity | All numeric fields successfully coerced; datetime fields parsed with UTC awareness |
-| Physical range validity | Coordinates within [-90,90] / [-180,180]; tilt angle within [0,90]; price within [-100, 2000] €/MWh |
-| Logical consistency | `pv_peak_power_kw > 0` (clients without solar generation have no reason to be in the system) |
-| Deduplication | Most recently ingested record per natural key is retained |
+| Completitud del esquema | Los campos críticos (`client_id`, `latitude`, `longitude`, `pv_peak_power_kw`) son no nulos |
+| Validez de tipo | Todos los campos numéricos se coaccionan con éxito; los campos datetime se parsean con conciencia UTC |
+| Validez de rango físico | Coordenadas dentro de [-90,90] / [-180,180]; ángulo de inclinación dentro de [0,90]; precio dentro de [-100, 2.000] €/MWh |
+| Consistencia lógica | `pv_peak_power_kw > 0` (los clientes sin generación solar no tienen razón de estar en el sistema) |
+| Deduplicación | Se conserva el registro ingestado más recientemente por clave natural |
 
-A Silver record is promoted to Gold when:
-- It falls within the processing window (`unix_time >= now − 2 hours` for the fact table)
-- All required join surfaces are available (LEFT JOINs ensure partial data is never a blocking condition)
+Un registro Silver se promueve a Gold cuando:
+- Cae dentro de la ventana de procesamiento (`unix_time >= ahora − 2 horas` para la tabla de hechos)
+- Todas las superficies de join requeridas están disponibles (los LEFT JOINs garantizan que los datos parciales nunca sean una condición de bloqueo)
 
-### 4.3 Alternatives Considered and Discarded
+### 4.3 Alternativas Consideradas y Descartadas
 
-**Lambda Architecture (batch + streaming layers):**
-Rejected. SunSaver's data sources are inherently batch (REE publishes prices once daily; OWM forecast granularity is 3-hourly). Maintaining a dual-path architecture (batch + speed layer) would add operational complexity with zero benefit. The Medallion pattern covers the required latency profile entirely.
+**Arquitectura Lambda (batch + streaming):**
+Rechazada. Las fuentes de datos de SunSaver son inherentemente batch (REE publica precios una vez al día; la granularidad de previsión de OWM es de 3 horas). Mantener una arquitectura de doble camino (lote + velocidad) añadiría complejidad operativa sin ningún beneficio. El patrón Medallion cubre completamente el perfil de latencia requerido.
 
-**Flat file pipeline (CSV-in, CSV-out):**
-Rejected. CSV files provide no schema enforcement, no atomic transactions, no join semantics, and no audit trail. The manifest-driven + SQLite approach provides all of these at zero additional infrastructure cost.
+**Pipeline de ficheros planos (CSV de entrada y salida):**
+Rechazada. Los ficheros CSV no proporcionan aplicación de esquema, transacciones atómicas, semántica de joins ni trazabilidad de auditoría. El enfoque de manifiestos + SQLite proporciona todo esto a coste de infraestructura adicional cero.
 
-**Full RDBMS (PostgreSQL) from day one:**
-Considered and deferred. PostgreSQL would provide multi-user concurrency, extensions (TimescaleDB for time-series), and network access. However, for the current scale (single-client on-premise deployment, <50 clients, <1M rows), the operational overhead of managing a Postgres server outweighs the benefits. SQLite delivers identical query semantics, runs in-process, requires zero configuration, and supports atomic transactions. The migration path to PostgreSQL is documented in the roadmap (Section 8).
+**SGBD completo (PostgreSQL) desde el primer día:**
+Considerada y aplazada. PostgreSQL proporcionaría concurrencia multi-usuario, extensiones (TimescaleDB para series temporales) y acceso en red. Sin embargo, para la escala actual (despliegue on-premise mono-cliente, <50 clientes, <1M de filas), la sobrecarga operativa de gestionar un servidor Postgres supera los beneficios. SQLite ofrece semántica de consultas idéntica, se ejecuta en proceso, requiere configuración cero y soporta transacciones atómicas. El camino de migración a PostgreSQL está documentado en la hoja de ruta.
 
-**Parquet files for Silver layer:**
-Considered. Parquet would provide columnar compression and compatibility with pandas/Spark. Rejected for Silver because it adds a dependency on a columnar I/O library, loses the ability to use SQL for ad-hoc inspection, and provides no advantage at the current data volumes. Parquet is the correct choice for Bronze if the platform scales to multi-gigabyte daily ingestion — this is documented as a future migration path.
+**Ficheros Parquet para la capa Silver:**
+Considerada. Parquet proporcionaría compresión columnar y compatibilidad con pandas/Spark. Rechazada para Silver porque añade una dependencia de librería de E/S columnar, pierde la capacidad de usar SQL para inspección ad-hoc y no ofrece ninguna ventaja con los volúmenes de datos actuales. Parquet es la elección correcta para Bronze si la plataforma escala a volúmenes de ingesta diaria de varios gigabytes — esto está documentado como camino futuro de migración.
 
 ---
 
-## 5. Technology Stack Decisions
+## 5. Decisiones sobre el Stack Tecnológico
 
-### 5.1 Database Selection (per layer)
+### 5.1 Selección de Base de Datos (por capa)
 
-| Layer | Storage format | Rationale |
+| Capa | Formato de almacenamiento | Justificación |
 |---|---|---|
-| Bronze | JSON files (timestamped, chmod 444) | Maximum fidelity to source; no parsing loss; immutable by OS-level permission; human-readable for debugging |
-| Silver | SQLite (sunsaver.db) | Zero-configuration, file-based, full ACID, standard SQL, UPSERT semantics, composite PKs, sufficient for ≤100 clients |
-| Gold | SQLite (same database) | Co-located with Silver for join efficiency; separate logical namespace via table naming convention; single-file backup |
-| Process control | JSON manifests (per-source) | Human-readable, trivially version-controlled, no external dependency, append-only log semantics |
-| Audit / telemetry | SQLite (etl_metadata table) | Structured, queryable, co-located; no external monitoring infrastructure required for v1.0 |
+| Bronze | Ficheros JSON (con marca temporal, chmod 444) | Máxima fidelidad a la fuente; sin pérdida de parseo; inmutable por permiso del SO; legible por humanos para depuración |
+| Silver | SQLite (sunsaver.db) | Sin configuración, basado en fichero, ACID completo, SQL estándar, semántica UPSERT, PKs compuestas, suficiente para ≤100 clientes |
+| Gold | SQLite (misma base de datos) | Co-ubicado con Silver para eficiencia de joins; espacio de nombres lógico separado por convención de nomenclatura de tablas; backup de un solo fichero |
+| Control de procesos | Manifiestos JSON (por fuente) | Legibles por humanos, trivialmente versionables, sin dependencia externa, semántica de log de solo-adición |
+| Auditoría / telemetría | SQLite (tabla etl_metadata) | Estructurado, consultable, co-ubicado; no requiere infraestructura de monitorización externa para v1.0 |
 
-**SQLite was specifically chosen over alternatives because:**
-- On-premise deployment with a single writer process eliminates the primary SQLite limitation (write concurrency).
-- The SQLite file can be directly opened in DB Browser for SQLite (as evidenced in the project screenshots), enabling non-technical stakeholders to inspect data without additional tooling.
-- Backup is a single `cp sunsaver.db sunsaver.db.bak` command — operationally trivial.
-- SQLite supports window functions (`ROW_NUMBER() OVER PARTITION BY`) used in `gold_dim_weather.py`, confirming that the version in use is ≥ 3.25.0.
+**SQLite fue elegido específicamente frente a alternativas porque:**
+- El despliegue on-premise con un único proceso escritor elimina la limitación principal de SQLite (concurrencia de escritura).
+- El fichero SQLite puede abrirse directamente en DB Browser for SQLite (como evidencian las capturas del proyecto), permitiendo a las partes interesadas no técnicas inspeccionar datos sin herramientas adicionales.
+- El backup es un simple `cp sunsaver.db sunsaver.db.bak` — trivial operativamente.
+- SQLite soporta funciones de ventana (`ROW_NUMBER() OVER PARTITION BY`) usadas en `gold_dim_weather.py`, confirmando que la versión en uso es ≥ 3.25.0.
 
-### 5.2 Orchestrator Selection
+### 5.2 Selección del Orquestador
 
-**Chosen: Custom Python orchestrator (`pipeline_runner.py`)**
+**Elegido: Orquestador Python personalizado (`pipeline_runner.py`)**
 
-A deliberate choice to build a lightweight, self-contained orchestrator rather than adopting Apache Airflow, Prefect, or Dagster.
+Una decisión deliberada de construir un orquestador ligero y autocontenido en lugar de adoptar Apache Airflow, Prefect o Dagster.
 
-Rationale:
-- The pipeline has a fixed, acyclic topology (6 stages, 11 steps). Dynamic DAG generation provides no value at this scale.
-- Airflow requires a metadata database, a web server, a scheduler process, and executor workers. This is disproportionate infrastructure for an on-premise SME deployment.
-- The custom orchestrator provides `--stage N` (resume) and `--dry-run` (planning) flags, per-step timing, stage-gate abort logic, and audit persistence — covering 100 % of operational requirements.
-- The orchestrator is 120 lines of idiomatic Python, fully readable and maintainable by any mid-level engineer without Airflow training.
+Justificación:
+- El pipeline tiene una topología fija y acíclica (6 etapas, 11 pasos). La generación dinámica de DAGs no aporta valor a esta escala.
+- Airflow requiere una base de datos de metadatos, un servidor web, un proceso planificador y workers ejecutores. Es una infraestructura desproporcionada para un despliegue on-premise en PYME.
+- El orquestador personalizado proporciona flags `--stage N` (reanudar) y `--dry-run` (planificación), temporización por paso, lógica de aborte por etapa y persistencia de auditoría — cubriendo el 100 % de los requisitos operativos.
+- El orquestador son 120 líneas de Python idiomático, totalmente legible y mantenible por cualquier ingeniero de nivel medio sin formación en Airflow.
 
-The migration path to a managed orchestrator (Prefect Cloud or Airflow on Docker) is defined for the multi-tenant SaaS roadmap (Section 8.2).
+El camino de migración a un orquestador gestionado (Prefect Cloud o Airflow en Docker) está definido para la hoja de ruta SaaS multi-tenant.
 
-### 5.3 Language and Frameworks
+### 5.3 Lenguaje y Frameworks
 
-**Python 3.12** — primary language.
+**Python 3.12** — lenguaje principal.
 
-| Library | Role | Justification |
+| Librería | Rol | Justificación |
 |---|---|---|
-| `pvlib` | Solar position and irradiance | NREL-validated, industry-standard PV modelling library; peer-reviewed algorithms |
-| `pandas` | Tabular data manipulation | Standard for ETL; vectorised operations; direct SQL read/write via `pd.read_sql` / `to_sql` |
-| `SQLAlchemy` | Database abstraction | Engine-level transactions; parameterised queries (SQL injection prevention); ORM optional |
-| `numpy` | Numerical computation | Vectorised trigonometry for physics engine; required by pvlib |
-| `requests` | HTTP API calls | Lightweight, battle-tested; timeout and error handling built-in |
-| `python-dotenv` | Environment variable management | Secrets never hardcoded; `.env` file pattern universally understood |
-| `openpyxl` | Excel ingestion | Required by pandas for `.xlsx` parsing |
+| `pvlib` | Posición solar e irradiancia | Librería de modelado FV validada por NREL, estándar de la industria; algoritmos revisados por pares |
+| `pandas` | Manipulación de datos tabulares | Estándar para ETL; operaciones vectorizadas; lectura/escritura SQL directa vía `pd.read_sql` / `to_sql` |
+| `SQLAlchemy` | Abstracción de base de datos | Transacciones a nivel de motor; consultas parametrizadas (prevención de inyección SQL); ORM opcional |
+| `numpy` | Computación numérica | Trigonometría vectorizada para el motor de física; requerido por pvlib |
+| `requests` | Llamadas HTTP a APIs | Ligero, probado en producción; gestión de timeouts y errores integrada |
+| `python-dotenv` | Gestión de variables de entorno | Credenciales nunca hardcodeadas; patrón de fichero `.env` universalmente conocido |
+| `openpyxl` | Ingesta de Excel | Requerido por pandas para parseo de `.xlsx` |
 
-**Notable absences (justified):**
-- No `celery` / `redis` — no async task queue required for sequential batch pipeline.
-- No `pydantic` — data validation is performed in pandas transforms; Pydantic models would be appropriate for a REST API layer (roadmap).
-- No `pytest` in core codebase — test suite is a defined roadmap item (Section 8.1).
+**Ausencias notables (justificadas):**
+- Sin `celery` / `redis` — no se requiere cola de tareas asíncrona para pipeline batch secuencial.
+- Sin `pydantic` — la validación de datos se realiza en las transformaciones pandas; los modelos Pydantic serían apropiados para una capa API REST (hoja de ruta).
+- Sin `pytest` en el código base principal — la suite de tests es un elemento definido en la hoja de ruta.
 
-### 5.4 Infrastructure (On-premise)
+### 5.4 Infraestructura (On-premise)
 
-**Deployment topology (current):**
+**Topología de despliegue (actual):**
 ```
-Single Linux server (Ubuntu 24)
-├── Python 3.12 virtual environment (venv)
-├── Cron job (or systemd timer) → python pipeline_runner.py
-├── /data/bronze/         ← NFS-mountable for backup
-├── /data/sunsaver.db     ← Single-file backup target
-└── /logs/                ← Log rotation via logrotate
+Servidor Linux único (Ubuntu 24)
+├── Entorno virtual Python 3.12 (venv)
+├── Tarea cron (o temporizador systemd) → python pipeline_runner.py
+├── /data/bronze/         ← Montable por NFS para backup
+├── /data/sunsaver.db     ← Objetivo de backup de fichero único
+└── /logs/                ← Rotación de logs vía logrotate
 ```
 
-**Operational runbook (simplified):**
+**Manual operativo simplificado:**
 ```bash
-# Full pipeline
+# Pipeline completo
 python pipeline_runner.py
 
-# Resume from weather extraction (skip Bronze client/price re-ingest)
+# Reanudar desde la extracción de meteorología (omitir re-ingesta Bronze de clientes/precios)
 python pipeline_runner.py --stage 3
 
-# Validate execution plan without side effects
+# Validar plan de ejecución sin efectos secundarios
 python pipeline_runner.py --dry-run
 ```
 
-**Backup strategy:** Daily `cp sunsaver.db sunsaver.db.$(date +%Y%m%d)` via cron. Bronze directory is append-only and can be archived to object storage independently of the database.
+**Estrategia de backup:** `cp sunsaver.db sunsaver.db.$(date +%Y%m%d)` diario vía cron. El directorio Bronze es de solo-adición y puede archivarse en almacenamiento de objetos de forma independiente a la base de datos.
 
 ---
 
-## 6. ADR Log — Individual Decision Records
+## 6. Registro ADR — Decisiones Individuales de Arquitectura
 
 ---
 
-### ADR-001: Medallion Architecture vs. Lambda Architecture
+### ADR-001: Arquitectura Medallion vs. Arquitectura Lambda
 
-**Date:** 2025-04  
-**Status:** Accepted  
-**Deciders:** Aitor Asin
+**Fecha:** 2025-04
+**Estado:** Aceptado
+**Decisores:** Aitor Asin
 
-**Context:**
-The system requires ingesting data from two external APIs (batch, daily) and an internal Excel source, transforming and enriching it through a physics engine, and making the results available for analytical queries. Two competing patterns were evaluated: Medallion (batch layers) and Lambda (batch + speed dual path).
+**Contexto:**
+El sistema requiere ingestar datos de dos APIs externas (batch, diario) y una fuente Excel interna, transformarlos y enriquecerlos a través de un motor de física, y hacer los resultados disponibles para consultas analíticas. Se evaluaron dos patrones competidores: Medallion (capas batch) y Lambda (dual batch + velocidad).
 
-**Decision:**
-Adopt the Medallion Architecture (Bronze → Silver → Gold).
+**Decisión:**
+Adoptar la Arquitectura Medallion (Bronze → Silver → Gold).
 
-**Rationale:**
-1. Data source latency is inherently batch (REE: daily; OWM: 3-hourly). There is no streaming data source that would justify a speed layer.
-2. The Medallion pattern provides full lineage from raw API response to analytical output, enabling deterministic reprocessing.
-3. Lambda architecture's operational overhead (maintaining two code paths that must produce identical results) is unjustified when the batch path alone satisfies all latency requirements.
+**Justificación:**
+1. La latencia de las fuentes de datos es inherentemente batch (REE: diario; OWM: 3 horas). No existe ninguna fuente de datos en streaming que justifique una capa de velocidad.
+2. El patrón Medallion proporciona trazabilidad completa desde la respuesta bruta de la API hasta la salida analítica, permitiendo el reprocesamiento determinista.
+3. La sobrecarga operativa de la arquitectura Lambda (mantener dos caminos de código que deben producir resultados idénticos) no está justificada cuando el camino batch por sí solo satisface todos los requisitos de latencia.
 
-**Consequences:**
-+ Full audit trail and reprocessing capability from Bronze.
-+ Simpler codebase (single code path).
-− Not suitable if a real-time SCADA data feed is introduced (Lambda or Kappa would be required).
-
----
-
-### ADR-002: Bronze Storage Format — JSON vs. Parquet vs. Raw API Response
-
-**Date:** 2025-04  
-**Status:** Accepted  
-**Deciders:** Aitor Asin
-
-**Context:**
-The Bronze layer must store the verbatim output of two REST APIs (REE, OpenWeatherMap) and one Excel file. The format must preserve full fidelity, be human-readable for debugging, and impose no parsing loss.
-
-**Decision:**
-Store Bronze data as timestamped, immutable JSON files with `chmod 444`.
-
-**Rationale:**
-1. REST APIs return JSON natively. Storing the response verbatim requires zero parsing at ingestion time, eliminating the possibility of format-induced data loss.
-2. JSON is human-readable. Debugging a Bronze file requires `cat` or any text editor — no tooling dependency.
-3. `chmod 444` provides OS-level immutability guarantees without requiring a specialised storage system (Delta Lake, Iceberg).
-4. The file naming convention (`{source}_{timestamp}.json`) provides implicit partitioning by ingestion date, enabling efficient Bronze-layer queries.
-
-**Alternatives considered:**
-- **Parquet:** Provides columnar compression and schema enforcement. Rejected because it requires a columnar reader, is not human-readable, and offers no advantage at current data volumes (< 1 MB per Bronze file).
-- **SQLite table (raw_clients, raw_prices, raw_weather):** Would enable SQL querying of Bronze data but loses the immutability guarantee and introduces schema coupling to the raw source structure.
-
-**Consequences:**
-+ Full API response fidelity; no Bronze-level data loss.
-+ OS-level immutability (chmod 444).
-+ Human-readable debugging.
-− Requires a manifest system to track processing state (addressed by process manifests).
+**Consecuencias:**
++ Trazabilidad completa y capacidad de reprocesamiento desde Bronze.
++ Base de código más simple (un único camino de código).
+− No adecuado si se introduce un feed de datos SCADA en tiempo real (Lambda o Kappa serían necesarios).
 
 ---
 
-### ADR-003: Silver Transformation Engine — pandas + SQLAlchemy vs. SQL-only vs. Spark
+### ADR-002: Formato de Almacenamiento Bronze — JSON vs. Parquet vs. Respuesta API Bruta
 
-**Date:** 2025-04  
-**Status:** Accepted  
-**Deciders:** Aitor Asin
+**Fecha:** 2025-04
+**Estado:** Aceptado
+**Decisores:** Aitor Asin
 
-**Context:**
-The Silver layer must parse nested JSON structures (OpenWeatherMap 5-day forecast with 40 slots per client), apply time-series resampling (3h → 1h via linear interpolation), enforce business rules, and persist results to SQLite. The transformation engine must be maintainable by a single engineer.
+**Contexto:**
+La capa Bronze debe almacenar la salida literal de dos APIs REST (REE, OpenWeatherMap) y un fichero Excel. El formato debe preservar la fidelidad completa, ser legible por humanos para depuración y no imponer pérdidas de parseo.
 
-**Decision:**
-Use pandas for in-memory transformation and SQLAlchemy for database I/O.
+**Decisión:**
+Almacenar datos Bronze como ficheros JSON inmutables con marca temporal y `chmod 444`.
 
-**Rationale:**
-1. The OpenWeatherMap payload is a nested JSON structure with arrays. pandas' `json_normalize` and `resample` operations handle this natively; SQL CTEs would require multiple levels of JSON extraction functions that are SQLite-dialect-specific.
-2. The Erbs irradiance decomposition and Faiman cell temperature model require row-level numerical operations. pandas iterrows + numpy is the correct abstraction for physics row operations; SQL cannot express these models.
-3. SQLAlchemy provides parameterised query execution (protection against SQL injection) and engine-level transaction management, which is appropriate for the `INSERT OR REPLACE` upsert pattern.
-4. Spark (PySpark) would provide distributed processing at scale. At the current data volume (<10,000 rows per run), Spark's JVM startup overhead would make pipeline execution slower, not faster.
+**Justificación:**
+1. Las APIs REST devuelven JSON de forma nativa. Almacenar la respuesta literalmente requiere cero parseo en el momento de la ingesta, eliminando la posibilidad de pérdida de datos inducida por el formato.
+2. JSON es legible por humanos. Depurar un fichero Bronze requiere `cat` o cualquier editor de texto — sin dependencia de herramientas.
+3. `chmod 444` proporciona garantías de inmutabilidad a nivel del SO sin requerir un sistema de almacenamiento especializado (Delta Lake, Iceberg).
+4. La convención de nomenclatura de ficheros (`{fuente}_{marca_temporal}.json`) proporciona particionado implícito por fecha de ingesta.
 
-**Consequences:**
-+ Expressive temporal resampling (pandas resample/interpolate).
-+ Row-level physics model execution.
-+ SQL injection prevention via SQLAlchemy parameterisation.
-− pandas memory model is row-oriented; at >10M rows, vectorisation to polars or columnar operations would be required.
+**Alternativas consideradas:**
+- **Parquet:** Proporciona compresión columnar y aplicación de esquema. Rechazado porque requiere un lector columnar, no es legible por humanos y no ofrece ventaja a los volúmenes de datos actuales (<1 MB por fichero Bronze).
+- **Tabla SQLite (raw_clients, raw_prices, raw_weather):** Permitiría consultar los datos Bronze con SQL pero pierde la garantía de inmutabilidad e introduce acoplamiento de esquema a la estructura de la fuente bruta.
 
----
-
-### ADR-004: Gold Layer Dimensional Model — Star Schema vs. Flat Denormalised Table
-
-**Date:** 2025-04  
-**Status:** Accepted  
-**Deciders:** Aitor Asin
-
-**Context:**
-The Gold layer must serve analytical queries efficiently: "what was the solar generation for client X at hour Y?", "what was the PVPC price during tariff period P1 last week?", "which clients have a positive net energy balance during peak hours?". The model must be accessible to non-SQL tools (Power BI, Excel) without requiring complex joins.
-
-**Decision:**
-Implement a star schema with one fact table (`gold_fact_energy_forecast`) and three dimension tables (`gold_dim_client`, `gold_dim_datetime`, `gold_dim_weather`).
-
-**Rationale:**
-1. The star schema minimises query complexity for BI tools. Power BI and Tableau natively understand star schema relationships; a fully flat table would require repeated measures for dimensional attributes.
-2. `gold_dim_datetime` provides the 2.0TD tariff period classification (`P1 Punta / P2 Llano / P3 Valle / P6 Super-Valle`) as a precomputed attribute. This is expensive to compute at query time (requires timezone conversion + business rule evaluation) but trivial to join as a dimension.
-3. `gold_dim_weather` uses a `ROW_NUMBER() OVER PARTITION BY` window function to resolve the many-to-one mapping between `weather_id` and weather descriptions — a pattern that demonstrates intentional use of SQL analytic functions rather than application-level deduplication.
-4. The fact table uses `INSERT OR REPLACE` (upsert) with a 2-hour lookback window, enabling incremental updates without full table rebuilds.
-
-**Consequences:**
-+ BI-tool-ready model (Power BI, Tableau, Apache Superset).
-+ Precomputed tariff period and holiday flags eliminate query-time computation.
-+ Composite indexes on `unix_time` and `weather_id` provide sub-second analytical query response.
-− Dimension tables are atomically rebuilt on each run (DROP + CREATE + INSERT in a single transaction). For tables with >1M rows this approach would require incremental SCD (Slowly Changing Dimension) handling.
+**Consecuencias:**
++ Fidelidad completa de la respuesta API; sin pérdida de datos en Bronze.
++ Inmutabilidad a nivel del SO (chmod 444).
++ Depuración legible por humanos.
+− Requiere un sistema de manifiestos para rastrear el estado de procesamiento (resuelto por los manifiestos de proceso).
 
 ---
 
-### ADR-005: Partitioning Strategy — Time-based File Naming vs. Directory Partitioning
+### ADR-003: Motor de Transformación Silver — pandas + SQLAlchemy vs. Solo SQL vs. Spark
 
-**Date:** 2025-04  
-**Status:** Accepted  
-**Deciders:** Aitor Asin
+**Fecha:** 2025-04
+**Estado:** Aceptado
+**Decisores:** Aitor Asin
 
-**Context:**
-The Bronze layer accumulates one file per API call per run. Without partitioning, the Bronze directory becomes a flat list of files that is difficult to query or archive. A partitioning strategy is required that balances simplicity with operational usefulness.
+**Contexto:**
+La capa Silver debe parsear estructuras JSON anidadas (previsión de 5 días de OpenWeatherMap con 40 slots por cliente), aplicar remuestreo de series temporales (3h → 1h mediante interpolación lineal), aplicar reglas de negocio y persistir resultados en SQLite. El motor de transformación debe ser mantenible por un único ingeniero.
 
-**Decision:**
-Adopt implicit timestamp partitioning via filename convention (`{source}_{YYYYMMDD_HHMMSS}.json`) in the Bronze layer. For the Silver/Gold SQLite layers, partition by composite primary keys `(client_id, unix_time)`.
+**Decisión:**
+Usar pandas para transformación en memoria y SQLAlchemy para E/S de base de datos.
 
-**Rationale:**
-1. Filename-based partitioning requires zero infrastructure. Files are sorted chronologically by `ls` and trivially filtered by date prefix.
-2. The process manifest system (`_process_manifest_{source}.json`) provides an explicit index of Bronze files by status (pending / success / error), which is more useful operationally than directory-based partitioning.
-3. At current data volumes (< 100 files/day), directory-based partitioning (e.g., `bronze/2025/05/10/`) adds path complexity with no query performance benefit.
-4. The `(client_id, unix_time)` composite PK in Silver/Gold tables provides the functional equivalent of multi-dimensional partitioning for SQL queries.
+**Justificación:**
+1. El payload de OpenWeatherMap es una estructura JSON anidada con arrays. Las operaciones `json_normalize` y `resample` de pandas manejan esto de forma nativa; las CTEs SQL requerirían múltiples niveles de funciones de extracción JSON específicas del dialecto SQLite.
+2. La descomposición de irradiancia de Erbs y el modelo de temperatura de célula de Faiman requieren operaciones numéricas por fila. pandas iterrows + numpy es la abstracción correcta para operaciones de física por fila; SQL no puede expresar estos modelos.
+3. SQLAlchemy proporciona ejecución de consultas parametrizadas (protección contra inyección SQL) y gestión de transacciones a nivel de motor, apropiada para el patrón de upsert `INSERT OR REPLACE`.
+4. Spark (PySpark) proporcionaría procesamiento distribuido a escala. Con el volumen de datos actual (<10.000 filas por ejecución), la sobrecarga de arranque de la JVM de Spark haría la ejecución del pipeline más lenta, no más rápida.
 
-**Consequences:**
-+ Zero infrastructure overhead for Bronze partitioning.
-+ Manifest provides explicit processing state without filesystem traversal.
-− At high volume (>10,000 files/day), filename-based partitioning becomes unwieldy; directory hierarchy would be required.
-
----
-
-### ADR-006: Secrets and API Credential Management
-
-**Date:** 2025-04  
-**Status:** Accepted  
-**Deciders:** Aitor Asin
-
-**Context:**
-The pipeline requires two secrets: `WEATHER_API_KEY` (OpenWeatherMap) and optionally `DB_PATH`, `BRONZE_PATH`, `CLIENTS_SOURCE_PATH` (path overrides). These must be accessible at runtime without being hardcoded in source code.
-
-**Decision:**
-Use `.env` file + `python-dotenv` for local secret management. `.env` is excluded from version control via `.gitignore`. Path configuration is centralised in `config_paths.py`.
-
-**Rationale:**
-1. The 12-factor app methodology mandates environment-based configuration. `.env` + `python-dotenv` is the idiomatic Python implementation for local development and on-premise deployment.
-2. Centralising path resolution in `config_paths.py` ensures that changing the database path (e.g., for a staging environment) requires modifying one file or one environment variable — not searching across 15 scripts.
-3. The `_get_validated_path()` helper in `config_paths.py` automatically creates required directories (`mkdir -p` equivalent) and validates path resolution, eliminating `FileNotFoundError` exceptions from misconfiguration.
-
-**Future state:** For a multi-tenant cloud deployment, this pattern would be replaced by a secrets management service (HashiCorp Vault, AWS Secrets Manager, Azure Key Vault). The `config_paths.py` interface is designed to be a drop-in replacement target — all consumers reference `config_paths.get_db_path()`, not `os.getenv("DB_PATH")` directly.
-
-**Consequences:**
-+ No hardcoded credentials in source code.
-+ Single-point path management (`config_paths.py`).
-+ `.gitignore` prevents accidental credential exposure.
-− `.env` file on disk is a security risk if the server is compromised. For production, a dedicated secrets manager is required (roadmap item).
+**Consecuencias:**
++ Remuestreo temporal expresivo (pandas resample/interpolate).
++ Ejecución del modelo de física por fila.
++ Prevención de inyección SQL vía parametrización SQLAlchemy.
+− El modelo de memoria de pandas está orientado a filas; con >10M filas se requeriría vectorización a polars u operaciones columnares.
 
 ---
 
-## 7. Cross-Cutting Concerns
+### ADR-004: Modelo Dimensional Gold — Esquema en Estrella vs. Tabla Plana Desnormalizada
 
-### 7.1 Security and Access Control
+**Fecha:** 2025-04
+**Estado:** Aceptado
+**Decisores:** Aitor Asin
 
-**Current state (v1.0 — on-premise, single-user):**
+**Contexto:**
+La capa Gold debe servir consultas analíticas eficientemente: "¿cuál fue la generación solar para el cliente X a la hora Y?", "¿cuál fue el precio PVPC durante el periodo tarifario P1 la semana pasada?", "¿qué clientes tienen un balance energético neto positivo durante las horas pico?". El modelo debe ser accesible para herramientas no SQL (Power BI, Excel) sin requerir joins complejos.
 
-- API keys stored in `.env` with `600` permissions (owner read/write only).
-- Bronze files sealed with `chmod 444` — modification requires explicit `chmod` override, creating an audit event.
-- SQLite database file access is controlled by OS-level filesystem permissions.
-- No authentication layer on the data outputs (direct file/database access).
+**Decisión:**
+Implementar un esquema en estrella con una tabla de hechos (`gold_fact_energy_forecast`) y tres tablas dimensionales (`gold_dim_client`, `gold_dim_datetime`, `gold_dim_weather`).
 
-**Security boundaries:**
+**Justificación:**
+1. El esquema en estrella minimiza la complejidad de las consultas para herramientas BI. Power BI y Tableau entienden de forma nativa las relaciones en esquema en estrella; una tabla totalmente plana requeriría medidas repetidas para los atributos dimensionales.
+2. `gold_dim_datetime` proporciona la clasificación del período tarifario 2.0TD (`P1 Punta / P2 Llano / P3 Valle / P6 Super-Valle`) como atributo precalculado. Es costoso calcularlo en tiempo de consulta (requiere conversión de zona horaria + evaluación de reglas de negocio) pero trivial como join dimensional.
+3. `gold_dim_weather` usa una función de ventana `ROW_NUMBER() OVER PARTITION BY` para resolver el mapeo muchos-a-uno entre `weather_id` y descripciones meteorológicas — un patrón que demuestra el uso intencional de funciones analíticas SQL en lugar de deduplicación a nivel de aplicación.
+4. La tabla de hechos usa `INSERT OR REPLACE` (upsert) con una ventana de retroceso de 2 horas, permitiendo actualizaciones incrementales sin reconstrucciones completas de tabla.
+
+**Consecuencias:**
++ Modelo listo para herramientas BI (Power BI, Tableau, Apache Superset).
++ Período tarifario y festivos precalculados eliminan el cálculo en tiempo de consulta.
++ Índices compuestos sobre `unix_time` y `weather_id` proporcionan respuesta analítica sub-segundo.
+− Las tablas dimensionales se reconstruyen atómicamente en cada ejecución (DROP + CREATE + INSERT en una única transacción). Para tablas con >1M filas este enfoque requeriría gestión incremental de SCD (Dimensiones de Cambio Lento).
+
+---
+
+### ADR-005: Estrategia de Particionado — Nomenclatura Temporal de Ficheros vs. Particionado por Directorios
+
+**Fecha:** 2025-04
+**Estado:** Aceptado
+**Decisores:** Aitor Asin
+
+**Contexto:**
+La capa Bronze acumula un fichero por llamada API por ejecución. Sin particionado, el directorio Bronze se convierte en una lista plana de ficheros difícil de consultar o archivar. Se requiere una estrategia de particionado que equilibre la simplicidad con la utilidad operativa.
+
+**Decisión:**
+Adoptar particionado implícito por marca temporal vía convención de nomenclatura de ficheros (`{fuente}_{YYYYMMDD_HHMMSS}.json`) en la capa Bronze. Para las capas Silver/Gold en SQLite, particionar por claves primarias compuestas `(client_id, unix_time)`.
+
+**Justificación:**
+1. El particionado basado en nombre de fichero no requiere infraestructura. Los ficheros se ordenan cronológicamente con `ls` y se filtran trivialmente por prefijo de fecha.
+2. El sistema de manifiestos de proceso (`_process_manifest_{fuente}.json`) proporciona un índice explícito de ficheros Bronze por estado (pendiente / éxito / error), que es más útil operativamente que el particionado por directorios.
+3. Con los volúmenes actuales (<100 ficheros/día), el particionado por directorios (ej. `bronze/2025/05/10/`) añade complejidad de rutas sin beneficio alguno en el rendimiento de consultas.
+4. La PK compuesta `(client_id, unix_time)` en tablas Silver/Gold proporciona el equivalente funcional del particionado multidimensional para consultas SQL.
+
+**Consecuencias:**
++ Cero sobrecarga de infraestructura para el particionado Bronze.
++ El manifiesto proporciona estado de procesamiento explícito sin traversal del sistema de ficheros.
+− Con alto volumen (>10.000 ficheros/día), el particionado por nombre de fichero se vuelve inmanejable; se requeriría jerarquía de directorios.
+
+---
+
+### ADR-006: Gestión de Secretos y Credenciales de APIs
+
+**Fecha:** 2025-04
+**Estado:** Aceptado
+**Decisores:** Aitor Asin
+
+**Contexto:**
+El pipeline requiere dos secretos: `WEATHER_API_KEY` (OpenWeatherMap) y opcionalmente `DB_PATH`, `BRONZE_PATH`, `CLIENTS_SOURCE_PATH` (sobreescrituras de rutas). Estos deben ser accesibles en tiempo de ejecución sin estar hardcodeados en el código fuente.
+
+**Decisión:**
+Usar fichero `.env` + `python-dotenv` para la gestión de secretos local. El `.env` se excluye del control de versiones vía `.gitignore`. La configuración de rutas se centraliza en `config_paths.py`.
+
+**Justificación:**
+1. La metodología de aplicaciones de 12 factores exige configuración basada en entorno. `.env` + `python-dotenv` es la implementación Python idiomática para desarrollo local y despliegue on-premise.
+2. Centralizar la resolución de rutas en `config_paths.py` garantiza que cambiar la ruta de la base de datos (ej. para un entorno de staging) requiere modificar un fichero o una variable de entorno — no buscar en 15 scripts.
+3. El helper `_get_validated_path()` en `config_paths.py` crea automáticamente los directorios requeridos (equivalente a `mkdir -p`) y valida la resolución de rutas, eliminando excepciones `FileNotFoundError` por mala configuración.
+
+**Estado futuro:** Para un despliegue cloud multi-tenant, este patrón se reemplazaría por un servicio de gestión de secretos (HashiCorp Vault, AWS Secrets Manager, Azure Key Vault). La interfaz de `config_paths.py` está diseñada para ser un objetivo de sustitución directa — todos los consumidores referencian `config_paths.get_db_path()`, no `os.getenv("DB_PATH")` directamente.
+
+**Consecuencias:**
++ Sin credenciales hardcodeadas en el código fuente.
++ Gestión centralizada de rutas (`config_paths.py`).
++ `.gitignore` previene la exposición accidental de credenciales.
+− El fichero `.env` en disco es un riesgo de seguridad si el servidor se ve comprometido. Para producción, se requiere un gestor de secretos dedicado (elemento de hoja de ruta).
+
+---
+
+## 7. Preocupaciones Transversales
+
+### 7.1 Seguridad y Control de Acceso
+
+**Estado actual (v1.0 — on-premise, usuario único):**
+
+- Claves API almacenadas en `.env` con permisos `600` (solo lectura/escritura del propietario).
+- Ficheros Bronze sellados con `chmod 444` — la modificación requiere un `chmod` explícito, creando un evento de auditoría.
+- El acceso al fichero de base de datos SQLite está controlado por permisos del sistema de ficheros del SO.
+- Sin capa de autenticación en las salidas de datos (acceso directo a fichero/base de datos).
+
+**Fronteras de seguridad:**
 ```
-[External APIs] ──HTTPS──► [Pipeline] ──file-write──► [sunsaver.db]
-                                                           │
-                                                    chmod 444 (Bronze)
-                                                    OS filesystem ACL (DB)
-```
-
-**Identified security gaps (v1.0, accepted risk):**
-- No encryption at rest for the SQLite database. Client energy data and location coordinates are stored in plaintext. Acceptable for single-tenant on-premise deployment; unacceptable for cloud/SaaS.
-- No API rate limiting or circuit breaker on outbound API calls. If REE or OWM rate-limits the client, the pipeline will fail with an HTTP error and require manual retry.
-- No input sanitisation beyond pandas type coercion. The Excel client master file is implicitly trusted; a malicious Excel file with formula injection could be a vector.
-
-### 7.2 Observability — Logs, Metrics, Traces
-
-**Logging architecture:**
-
-The `logger_config.py` module implements a singleton logger (`SunSaver`) with the following properties:
-- **Dual-sink:** Simultaneous output to rotating daily log file (`logs/sunsaver_YYYY-MM-DD.log`) and console.
-- **Structured format:** `TIMESTAMP | LEVEL | MODULE | MESSAGE` — parseable by standard log aggregation tools (Filebeat, Fluentd).
-- **Log levels:** DEBUG (disabled on handlers in production), INFO (operational events), WARNING (degraded data quality), ERROR (step failure), CRITICAL (pipeline abort).
-- **Singleton guard:** The `if logger.handlers: return logger` check prevents duplicate handler attachment when multiple modules import the logger in the same process.
-
-**Module-level log prefixes (enforced convention):**
-```
-[INIT]      ← Stage/module start
-[EXTRACT]   ← Data read operations
-[TRANSFORM] ← Business logic application
-[LOAD]      ← Database write operations
-[BRONZE]    ← Bronze persistence
-[MANIFEST]  ← Process control updates
-[METADATA]  ← Audit table writes
-[DONE]      ← Successful completion
-[ERROR]     ← Handled error
+[APIs Externas] ──HTTPS──► [Pipeline] ──escritura fichero──► [sunsaver.db]
+                                                                  │
+                                                         chmod 444 (Bronze)
+                                                         ACL filesystem SO (BD)
 ```
 
-**Pipeline execution telemetry (`etl_metadata` table):**
+**Brechas de seguridad identificadas (v1.0, riesgo aceptado):**
+- Sin cifrado en reposo para la base de datos SQLite. Los datos energéticos de clientes y coordenadas de ubicación se almacenan en texto plano. Aceptable para despliegue on-premise mono-tenant; inaceptable para cloud/SaaS.
+- Sin limitación de tasa ni circuit breaker en llamadas API salientes. Si REE u OWM limita la tasa del cliente, el pipeline fallará con un error HTTP y requerirá reintento manual.
+- Sin saneamiento de inputs más allá de la coerción de tipos de pandas. El fichero Excel maestro de clientes se confía implícitamente; un Excel malicioso con inyección de fórmulas podría ser un vector de ataque.
 
-Every pipeline run persists a record to `etl_metadata` with: pipeline name, execution status (SUCCESS / PARTIAL SUCCESS / FAILED), duration in seconds, total rows affected, error detail string, environment, and UTC execution timestamp. This table is the primary SLA monitoring surface.
+### 7.2 Observabilidad — Logs, Métricas, Trazas
 
-**Observability gaps (v1.0, documented):**
-- No distributed tracing (OpenTelemetry). Per-step timing is available in logs but not structured as trace spans.
-- No metrics endpoint (Prometheus). Pipeline health is observable only by querying `etl_metadata` or reading logs.
-- No alerting. A failed pipeline produces a log entry and a FAILED status in `etl_metadata` but does not trigger any notification (email, Slack, PagerDuty).
+**Arquitectura de logging:**
 
-### 7.3 Error Handling and Retries
+El módulo `logger_config.py` implementa un logger singleton (`SunSaver`) con las siguientes propiedades:
+- **Doble destino:** Salida simultánea a fichero de log rotatorio diario (`logs/sunsaver_YYYY-MM-DD.log`) y consola.
+- **Formato estructurado:** `MARCA_TEMPORAL | NIVEL | MÓDULO | MENSAJE` — parseable por herramientas estándar de agregación de logs (Filebeat, Fluentd).
+- **Niveles de log:** DEBUG (deshabilitado en handlers en producción), INFO (eventos operativos), WARNING (calidad de dato degradada), ERROR (fallo de paso), CRITICAL (aborte del pipeline).
+- **Guardia singleton:** La comprobación `if logger.handlers: return logger` evita la adición duplicada de handlers cuando múltiples módulos importan el logger en el mismo proceso.
 
-**Error handling strategy:**
+**Prefijos de log por módulo (convención aplicada):**
+```
+[INIT]      ← Inicio de etapa/módulo
+[EXTRACT]   ← Operaciones de lectura de datos
+[TRANSFORM] ← Aplicación de lógica de negocio
+[LOAD]      ← Operaciones de escritura en base de datos
+[BRONZE]    ← Persistencia en Bronze
+[MANIFEST]  ← Actualizaciones del control de procesos
+[METADATA]  ← Escrituras en tabla de auditoría
+[DONE]      ← Finalización exitosa
+[ERROR]     ← Error gestionado
+```
 
-The pipeline implements a three-tier error handling model:
+**Telemetría de ejecución del pipeline (tabla `etl_metadata`):**
 
-**Tier 1 — Physics engine (function-level):** Every function in `engine_pv_physics.py` wraps its computation in a `try/except` block and returns a safe default value (typically `0.0`) on any exception. This ensures that a single malformed row never crashes the pipeline — it produces a zero-generation record instead, which is a correct and conservative output.
+Cada ejecución del pipeline persiste un registro en `etl_metadata` con: nombre del pipeline, estado de ejecución (SUCCESS / PARTIAL SUCCESS / FAILED), duración en segundos, total de filas afectadas, cadena de detalle de error, entorno y marca temporal UTC de ejecución. Esta tabla es la superficie principal de monitorización de SLA.
 
-**Tier 2 — Step-level (orchestrator):** Each pipeline step is executed inside `run_step()`, which catches all exceptions, logs them with full traceback (`exc_info=True`), and returns `(False, 0)`. The orchestrator accumulates failed step counts without propagating the exception.
+**Brechas de observabilidad (v1.0, documentadas):**
+- Sin trazas distribuidas (OpenTelemetry). La temporización por paso está disponible en logs pero no como trazas estructuradas.
+- Sin endpoint de métricas (Prometheus). La salud del pipeline solo es observable consultando `etl_metadata` o leyendo logs.
+- Sin alertas. Un pipeline fallido produce una entrada de log y un estado FAILED en `etl_metadata` pero no dispara ninguna notificación (email, Slack, PagerDuty).
 
-**Tier 3 — Stage-level (abort gate):** If `all()` steps within a stage return `False`, the orchestrator calls `logger.critical()` and returns `False`, preventing downstream stages from executing with corrupted input data.
+### 7.3 Gestión de Errores y Reintentos
 
-**Retry mechanism:**
+**Estrategia de gestión de errores:**
 
-The manifest system provides automatic retry for Bronze-to-Silver failures. Tasks with status `error` in a process manifest are re-queued on the next pipeline run alongside `pending` tasks. This covers transient failures (network timeout, API unavailability) without requiring manual intervention.
+El pipeline implementa un modelo de gestión de errores de tres niveles:
 
-**API availability handling (REE-specific):**
+**Nivel 1 — Motor de física (a nivel de función):** Cada función de `engine_pv_physics.py` envuelve su computación en un bloque `try/except` y devuelve un valor seguro por defecto (típicamente `0.0`) ante cualquier excepción. Esto garantiza que una única fila malformada nunca hace caer el pipeline — produce un registro de generación cero en su lugar, que es una salida correcta y conservadora.
 
-The REE API returns no PVPC data before ~20:30 CET. `extract_energy_prices()` returns `False` (not an exception) when no data is available, which triggers a PARTIAL SUCCESS pipeline state rather than a hard failure. This is the correct behaviour: the pipeline can complete stages 3–6 with cached price data from a previous run.
+**Nivel 2 — A nivel de paso (orquestador):** Cada paso del pipeline se ejecuta dentro de `run_step()`, que captura todas las excepciones, las registra con traza completa (`exc_info=True`) y devuelve `(False, 0)`. El orquestador acumula recuentos de pasos fallidos sin propagar la excepción.
 
-### 7.4 Data Versioning Strategy
+**Nivel 3 — A nivel de etapa (puerta de aborte):** Si `all()` los pasos dentro de una etapa devuelven `False`, el orquestador llama a `logger.critical()` y devuelve `False`, evitando que las etapas posteriores se ejecuten con datos de entrada corruptos.
 
-**Bronze versioning (implicit, via timestamped files):**
-Every Bronze ingestion creates a new timestamped file. The complete history of API responses is preserved indefinitely (subject to disk capacity). This provides point-in-time reprocessing capability: any historical state of the Silver or Gold layer can be reconstructed by replaying the Bronze files from the corresponding timestamp range.
+**Mecanismo de reintentos:**
 
-**Silver versioning (upsert-based, current state):**
-Silver tables maintain the current-state view. Historical Silver records are overwritten by more recent ingestions for the same `(client_id, unix_time)` key. Point-in-time recovery requires replaying from Bronze.
+El sistema de manifiestos proporciona reintento automático para fallos de Bronze a Silver. Las tareas con estado `error` en un manifiesto de proceso se vuelven a encolar en la siguiente ejecución del pipeline junto con las tareas `pending`. Esto cubre fallos transitorios (timeout de red, indisponibilidad de API) sin requerir intervención manual.
 
-**Gold versioning (atomic rebuild for dimensions, incremental for fact):**
-Dimension tables are atomically rebuilt on every run (DROP + CREATE + INSERT in transaction). The fact table uses incremental upsert with a 2-hour lookback window. This means the Gold layer is always current but does not maintain historical snapshots.
+**Gestión de disponibilidad de API (específica de REE):**
 
-**Schema versioning:**
-There is no formal schema migration framework in v1.0. Schema changes require manual DDL execution. The SQLAlchemy `metadata.create_all()` pattern in `audit_metadata.py` provides additive schema evolution (new tables) but not column-level migrations. Alembic integration is a defined roadmap item.
+La API de REE no devuelve datos PVPC antes de las ~20:30 CET. `extract_energy_prices()` devuelve `False` (no una excepción) cuando no hay datos disponibles, lo que dispara un estado de ÉXITO PARCIAL del pipeline en lugar de un fallo total. Este es el comportamiento correcto: el pipeline puede completar las etapas 3–6 con datos de precios cacheados de una ejecución anterior.
+
+### 7.4 Estrategia de Versionado de Datos
+
+**Versionado Bronze (implícito, mediante ficheros con marca temporal):**
+Cada ingesta Bronze crea un nuevo fichero con marca temporal. El historial completo de respuestas API se preserva indefinidamente (sujeto a capacidad de disco). Esto proporciona capacidad de reprocesamiento en un punto temporal: cualquier estado histórico de la capa Silver o Gold puede reconstruirse reproduciendo los ficheros Bronze del rango de marca temporal correspondiente.
+
+**Versionado Silver (basado en upsert, estado actual):**
+Las tablas Silver mantienen la vista del estado actual. Los registros Silver históricos son sobreescritos por ingestas más recientes para la misma clave `(client_id, unix_time)`. La recuperación en un punto temporal requiere reproducir desde Bronze.
+
+**Versionado Gold (reconstrucción atómica para dimensiones, incremental para hechos):**
+Las tablas dimensionales se reconstruyen atómicamente en cada ejecución (DROP + CREATE + INSERT en transacción). La tabla de hechos usa upsert incremental con una ventana de retroceso de 2 horas. Esto significa que la capa Gold está siempre actualizada pero no mantiene snapshots históricos.
+
+**Versionado de esquema:**
+No existe un framework formal de migración de esquema en v1.0. Los cambios de esquema requieren ejecución manual de DDL. El patrón `metadata.create_all()` de SQLAlchemy en `audit_metadata.py` proporciona evolución aditiva del esquema (nuevas tablas) pero no migraciones a nivel de columna. La integración de Alembic es un elemento definido en la hoja de ruta.
 
 ---
 
-## 8. Technical Roadmap
+## 8. Hoja de Ruta Técnica
 
-### 8.1 Known Technical Debt
+### 8.1 Deuda Técnica Conocida
 
-| ID | Item | Impact | Effort | Priority |
+| ID | Elemento | Impacto | Esfuerzo | Prioridad |
 |---|---|---|---|---|
-| TD-01 | No automated test suite | Medium: regressions in physics engine or transformation logic are caught manually | High | High |
-| TD-02 | No Alembic / schema migration framework | Medium: schema changes require manual DDL; risk of production schema drift | Medium | High |
-| TD-03 | No alerting on pipeline failure | High: a failed overnight run is not detected until manual log inspection | Low | High |
-| TD-04 | Industrial consumption model is synthetic (shift-schedule + Gaussian noise) | High: consumption estimates are approximations, not measured actuals | High (requires SCADA integration) | Medium |
-| TD-05 | No rate limiting / circuit breaker on API calls | Low: acceptable for single-tenant; risk increases with client count | Low | Medium |
-| TD-06 | SQLite single-writer constraint | Low at current scale; becomes blocking at >10 concurrent pipeline runs | Medium | Low |
-| TD-07 | No data lineage graph (column-level) | Low: file-level lineage available via manifests; column-level lineage requires additional tooling | Medium | Low |
-| TD-08 | `.env` file secrets (no dedicated secrets manager) | Low on-premise; High if migrated to cloud | Low | Low (until cloud migration) |
+| DT-01 | Sin suite de tests automatizados | Medio: las regresiones en el motor de física o la lógica de transformación se detectan manualmente | Alto | Alta |
+| DT-02 | Sin framework de migración de esquema (Alembic) | Medio: los cambios de esquema requieren DDL manual; riesgo de deriva del esquema en producción | Medio | Alta |
+| DT-03 | Sin alertas ante fallo del pipeline | Alto: una ejecución nocturna fallida no se detecta hasta la inspección manual de logs | Bajo | Alta |
+| DT-04 | El modelo de consumo industrial es sintético (turnos + ruido gaussiano) | Alto: las estimaciones de consumo son aproximaciones, no valores medidos reales | Alto (requiere integración SCADA) | Medio |
+| DT-05 | Sin limitación de tasa / circuit breaker en llamadas API | Bajo: aceptable para mono-tenant; el riesgo aumenta con el número de clientes | Bajo | Medio |
+| DT-06 | Restricción de escritor único de SQLite | Bajo a escala actual; se vuelve bloqueante con >10 ejecuciones de pipeline concurrentes | Medio | Bajo |
+| DT-07 | Sin grafo de linaje de datos (a nivel de columna) | Bajo: linaje a nivel de fichero disponible vía manifiestos; el linaje a nivel de columna requiere herramientas adicionales | Medio | Bajo |
+| DT-08 | Secretos en fichero `.env` (sin gestor de secretos dedicado) | Bajo on-premise; Alto si se migra a cloud | Bajo | Bajo (hasta migración cloud) |
 
-### 8.2 Planned Improvements
+### 8.2 Mejoras Planificadas
 
-**Phase 1 — Reliability (Q3 2025):**
-- Implement `pytest` test suite covering physics engine (unit tests with known solar geometry inputs), Silver transformation rules (data quality assertions), and Gold schema integrity (row count and primary key uniqueness checks).
-- Integrate `alembic` for database schema migration management.
-- Add email / Slack alerting on pipeline FAILED status via a lightweight notification hook in `pipeline_runner.py`.
-- Implement OpenWeatherMap API rate limit detection and exponential backoff retry.
+**Fase 1 — Fiabilidad (Q3 2025):**
+- Implementar suite de tests `pytest` cubriendo el motor de física (tests unitarios con inputs de geometría solar conocidos), las reglas de transformación Silver (aserciones de calidad de datos) e integridad del esquema Gold (recuento de filas y unicidad de clave primaria).
+- Integrar `alembic` para la gestión de migraciones del esquema de base de datos.
+- Añadir alertas por email / Slack ante estado FAILED del pipeline mediante un hook ligero de notificación en `pipeline_runner.py`.
+- Implementar detección de limitación de tasa de la API de OpenWeatherMap y reintento con backoff exponencial.
 
-**Phase 2 — Intelligence (Q4 2025):**
-- Replace synthetic consumption model with SCADA/Modbus data ingestion. Add `bronze_ingest_scada.py` and `silver_transform_scada.py` following the existing manifest pattern.
-- Add battery state-of-charge (SoC) optimisation module: given generation forecast, consumption forecast, PVPC prices, and battery parameters, compute the optimal charging schedule for each client.
-- Implement a REST API layer (FastAPI) to expose `gold_fact_energy_forecast` as a JSON endpoint, enabling integration with industrial HMI systems and custom dashboards.
+**Fase 2 — Inteligencia (Q4 2025):**
+- Reemplazar el modelo de consumo sintético con ingesta de datos SCADA/Modbus. Añadir `bronze_ingest_scada.py` y `silver_transform_scada.py` siguiendo el patrón de manifiestos existente.
+- Añadir módulo de optimización del estado de carga (SoC) de batería: dada la previsión de generación, la previsión de consumo, los precios PVPC y los parámetros de batería, calcular el programa de carga óptimo para cada cliente.
+- Implementar una capa de API REST (FastAPI) para exponer `gold_fact_energy_forecast` como un endpoint JSON, habilitando la integración con sistemas HMI industriales y dashboards personalizados.
 
-**Phase 3 — Scale (Q1 2026):**
-- **Database migration trigger:** When client count exceeds 50 or fact table row count exceeds 500,000 rows, migrate from SQLite to DuckDB (columnar, embedded, zero-configuration) or PostgreSQL (multi-writer, network-accessible).
-- **Storage migration trigger:** When daily Bronze volume exceeds 1 GB, migrate JSON files to Parquet with Hive-style directory partitioning (`bronze/year=2026/month=01/day=15/`).
-- **Orchestration migration trigger:** When pipeline is deployed for multiple independent tenants, migrate from `pipeline_runner.py` to Prefect Cloud or Apache Airflow on Docker Compose.
-- **Cloud-ready packaging:** Containerise the pipeline as a Docker image with environment-variable-driven configuration, enabling deployment on any cloud provider's container runtime (AWS ECS, Azure Container Instances, GCP Cloud Run).
+**Fase 3 — Escala (Q1 2026):**
+- **Criterio de activación de migración de base de datos:** Cuando el número de clientes supere 50 o el recuento de filas de la tabla de hechos supere 500.000, migrar de SQLite a DuckDB (columnar, embebido, sin configuración) o PostgreSQL (multi-escritor, accesible en red).
+- **Criterio de activación de migración de almacenamiento:** Cuando el volumen diario de Bronze supere 1 GB, migrar los ficheros JSON a Parquet con particionado al estilo Hive (`bronze/year=2026/month=01/day=15/`).
+- **Criterio de activación de migración de orquestación:** Cuando el pipeline se despliegue para múltiples tenants independientes, migrar de `pipeline_runner.py` a Prefect Cloud o Apache Airflow en Docker Compose.
+- **Empaquetado cloud-ready:** Contenerizar el pipeline como imagen Docker con configuración basada en variables de entorno, habilitando el despliegue en el runtime de contenedores de cualquier proveedor cloud (AWS ECS, Azure Container Instances, GCP Cloud Run).
 
-**Phase 4 — Platform (2026+):**
-- Multi-tenant SaaS architecture: isolated databases per tenant, shared orchestration layer, web-based onboarding for new industrial clients.
-- Machine learning layer: replace physics-model generation estimates with a hybrid physics + ML model trained on actual generation vs. forecast error data. The Gold layer's historical `gold_fact_energy_forecast` data is the direct training set.
-- ISO 50001 Energy Management System integration: map SunSaver outputs to the energy performance indicators (EnPIs) required for ISO 50001 certification, positioning the platform as a compliance tool for industrial clients.
-
----
-
-*Document maintained by: Aitor Asin*  
-*Last updated: 2025-05-10*  
-*Version history: [1.0.0] Initial release — complete ADR covering all architectural decisions through pipeline v1.0*
+**Fase 4 — Plataforma (2026+):**
+- Arquitectura SaaS multi-tenant: bases de datos aisladas por tenant, capa de orquestación compartida, onboarding web para nuevos clientes industriales.
+- Capa de machine learning: reemplazar las estimaciones de generación del modelo de física con un modelo híbrido física + ML entrenado con datos reales de error de generación vs. previsión. Los datos históricos de `gold_fact_energy_forecast` de la capa Gold son el conjunto de entrenamiento directo.
+- Integración con Sistema de Gestión de Energía ISO 50001: mapear las salidas de SunSaver a los indicadores de rendimiento energético (EnPIs) requeridos para la certificación ISO 50001, posicionando la plataforma como herramienta de cumplimiento normativo para clientes industriales.
 
 ---
 
-> **For technical questions regarding this document, refer to the source code in `/src/` and the execution logs in `/logs/`. For operational questions, consult the pipeline audit table (`etl_metadata`) in `sunsaver.db`.**
+*Documento mantenido por: Aitor Asin*
+*Última actualización: 2025-05-10*
+*Historial de versiones: [1.0.0] Versión inicial — ADR completo cubriendo todas las decisiones arquitectónicas hasta pipeline v1.0*
+
+---
+
+> **Para preguntas técnicas sobre este documento, consultar el código fuente en `/src/` y los logs de ejecución en `/logs/`. Para preguntas operativas, consultar la tabla de auditoría del pipeline (`etl_metadata`) en `sunsaver.db`.**
