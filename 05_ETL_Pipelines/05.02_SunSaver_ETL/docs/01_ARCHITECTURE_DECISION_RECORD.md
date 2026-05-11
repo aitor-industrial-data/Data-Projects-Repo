@@ -1,6 +1,8 @@
-# 01 — Registro de Decisiones de Arquitectura (ADR)
-## SunSaver · Plataforma de Inteligencia Energética Industrial
-**Versión:** 1.0.0 · **Estado:** Activo · **Autor:** Aitor Asin · **Fecha:** 2025-05-10
+# ☀️ SunSaver · Plataforma de Inteligencia Energética Industrial
+# 01 Registro de Decisiones de Arquitectura (ADR)
+
+> **Clasificación:** INTERNA &nbsp;|&nbsp; **Estado:** ACTIVO — Entorno DEV &nbsp;|&nbsp; **Pipeline:** `SunSaver_ETL`  
+> **Propietario:** Equipo de Datos — SunSaver &nbsp;|&nbsp; **Última actualización:** 2026-05-10
 
 > *"Este documento es la fuente única de verdad de cada decisión arquitectónica tomada en la plataforma SunSaver. Existe para explicar no solo qué se construyó, sino por qué — y qué se descartó deliberadamente."*
 
@@ -121,11 +123,11 @@ Las PYMES industriales españolas con instalaciones fotovoltaicas se enfrentan a
 ┌─────────────────────────────────────────────────────────────────────┐
 │                        SISTEMAS EXTERNOS                            │
 │                                                                     │
-│  ┌──────────────────┐     ┌──────────────────┐                     │
-│  │   API REE        │     │  OpenWeatherMap   │                     │
-│  │  (Precios PVPC)  │     │  API de Previsión │                     │
-│  │  apidatos.ree.es │     │  api.openweather. │                     │
-│  └────────┬─────────┘     └────────┬──────────┘                    │
+│  ┌──────────────────┐       ┌───────────────────┐                   │
+│  │   API REE        │       │  OpenWeatherMap   │                   │
+│  │  (Precios PVPC)  │       │  API de Previsión │                   │
+│  │  apidatos.ree.es │       │  api.openweather. │                   │
+│  └────────┬─────────┘       └────────┬──────────┘                   │
 └───────────┼──────────────────────────┼──────────────────────────────┘
             │  JSON/REST               │  JSON/REST
             ▼                          ▼
@@ -158,64 +160,64 @@ Las PYMES industriales españolas con instalaciones fotovoltaicas se enfrentan a
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────────┐
-│                        CONTENEDOR: PIPELINE SUNSAVER                             │
+│                          CONTENEDOR: PIPELINE SUNSAVER                           │
 │                                                                                  │
 │  ┌─────────────────────────────────────────────────────────────────────────────┐ │
-│  │  pipeline_runner.py  ← ORQUESTADOR (Stage-gate, Auditoría, CLI)            │ │
+│  │  pipeline_runner.py  ← ORQUESTADOR (Stage-gate, Auditoría, CLI)             │ │
 │  └───────┬─────────────────────────────────────────────────────────────────────┘ │
 │          │                                                                       │
-│    ┌─────▼──────────────────────────────────────────────────────────────────┐   │
+│    ┌─────▼───────────────────────────────────────────────────────────────────┐   │
 │    │  ETAPA 1 — EXTRACCIÓN BRONZE (Segura en paralelo, basada en manifiestos)│   │
-│    │  ┌─────────────────────┐  ┌──────────────────────┐                    │   │
-│    │  │bronze_ingest_clients│  │bronze_ingest_prices  │                    │   │
-│    │  │ Excel → JSON (444)  │  │ API REE → JSON (444) │                    │   │
-│    │  └─────────────────────┘  └──────────────────────┘                    │   │
-│    └───────────────────────────────────────────────────────────────────────┘   │
+│    │  ┌─────────────────────┐      ┌──────────────────────┐                  │   │
+│    │  │bronze_ingest_clients│      │bronze_ingest_prices  │                  │   │
+│    │  │ Excel → JSON (444)  │      │ API REE → JSON (444) │                  │   │
+│    │  └─────────────────────┘      └──────────────────────┘                  │   │
+│    └─────────────────────────────────────────────────────────────────────────┘   │
 │          │                                                                       │
-│    ┌─────▼──────────────────────────────────────────────────────────────────┐   │
-│    │  ETAPA 2 — TRANSFORMACIÓN SILVER (Basada en manifiestos, idempotente)  │   │
-│    │  ┌──────────────────────┐  ┌──────────────────────┐                   │   │
-│    │  │silver_transform_     │  │silver_transform_     │                   │   │
-│    │  │clients               │  │prices                │                   │   │
-│    │  │ JSON → clean_clients │  │ JSON → clean_prices  │                   │   │
-│    │  └──────────────────────┘  └──────────────────────┘                   │   │
-│    └───────────────────────────────────────────────────────────────────────┘   │
+│    ┌─────▼───────────────────────────────────────────────────────────────────┐   │
+│    │  ETAPA 2 — TRANSFORMACIÓN SILVER (Basada en manifiestos, idempotente)   │   │
+│    │  ┌──────────────────────┐      ┌──────────────────────┐                 │   │
+│    │  │silver_transform_     │      │silver_transform_     │                 │   │
+│    │  │clients               │      │prices                │                 │   │
+│    │  │ JSON → clean_clients │      │ JSON → clean_prices  │                 │   │
+│    │  └──────────────────────┘      └──────────────────────┘                 │   │
+│    └─────────────────────────────────────────────────────────────────────────┘   │
 │          │                                                                       │
-│    ┌─────▼──────────────────────────────────────────────────────────────────┐   │
-│    │  ETAPA 3 — WEATHER BRONZE (Bucle por coordenadas, fallos aislados)     │   │
-│    │  ┌─────────────────────────────────────────────────────────────────┐  │   │
-│    │  │ bronze_ingest_weather_owm  (lee clean_clients para coordenadas) │  │   │
-│    │  │ API OWM → JSON por cliente (444)                                │  │   │
-│    │  └─────────────────────────────────────────────────────────────────┘  │   │
-│    └───────────────────────────────────────────────────────────────────────┘   │
+│    ┌─────▼───────────────────────────────────────────────────────────────────┐   │
+│    │  ETAPA 3 — WEATHER BRONZE (Bucle por coordenadas, fallos aislados)      │   │
+│    │  ┌─────────────────────────────────────────────────────────────────┐    │   │
+│    │  │ bronze_ingest_weather_owm (lee clean_clients para coordenadas)  │    │   │
+│    │  │ API OWM → JSON por cliente (444)                                │    │   │
+│    │  └─────────────────────────────────────────────────────────────────┘    │   │
+│    └─────────────────────────────────────────────────────────────────────────┘   │
 │          │                                                                       │
-│    ┌─────▼──────────────────────────────────────────────────────────────────┐   │
-│    │  ETAPA 4 — WEATHER SILVER (Remuestreo 3h→1h, ingeniería de atributos) │   │
-│    │  ┌─────────────────────────────────────────────────────────────────┐  │   │
-│    │  │ silver_transform_weather → clean_weather                        │  │   │
-│    │  └─────────────────────────────────────────────────────────────────┘  │   │
-│    └───────────────────────────────────────────────────────────────────────┘   │
+│    ┌─────▼───────────────────────────────────────────────────────────────────┐   │
+│    │  ETAPA 4 — WEATHER SILVER (Remuestreo 3h→1h, ingeniería de atributos)   │   │
+│    │  ┌─────────────────────────────────────────────────────────────────┐    │   │
+│    │  │ silver_transform_weather → clean_weather                        │    │   │
+│    │  └─────────────────────────────────────────────────────────────────┘    │   │
+│    └─────────────────────────────────────────────────────────────────────────┘   │
 │          │                                                                       │
-│    ┌─────▼──────────────────────────────────────────────────────────────────┐   │
-│    │  ETAPA 5 — MOTOR DE FÍSICA FV (Simulación por fila, vectorizada)      │   │
-│    │  ┌───────────────────────┐    ┌───────────────────────────────────┐  │   │
-│    │  │silver_calc_pv_        │───►│ engine_pv_physics.py             │  │   │
-│    │  │generation             │    │ Pos. Solar → GHI → DNI/DHI →    │  │   │
-│    │  │ → clean_calculations  │    │ POA → Faiman → P_AC + P_carga   │  │   │
-│    │  └───────────────────────┘    └───────────────────────────────────┘  │   │
-│    └───────────────────────────────────────────────────────────────────────┘   │
+│    ┌─────▼───────────────────────────────────────────────────────────────────┐   │
+│    │  ETAPA 5 — MOTOR DE FÍSICA FV (Simulación por fila, vectorizada)        │   │
+│    │  ┌───────────────────────┐    ┌───────────────────────────────────┐     │   │
+│    │  │silver_calc_pv_        │───►│ engine_pv_physics.py              │     │   │
+│    │  │generation             │    │ Pos. Solar → GHI → DNI/DHI →      │     │   │
+│    │  │ → clean_calculations  │    │ POA → Faiman → P_AC + P_carga     │     │   │
+│    │  └───────────────────────┘    └───────────────────────────────────┘     │   │
+│    └─────────────────────────────────────────────────────────────────────────┘   │
 │          │                                                                       │
-│    ┌─────▼──────────────────────────────────────────────────────────────────┐   │
-│    │  ETAPA 6 — CAPA GOLD (Esquema en estrella, reconstrucción atómica)    │   │
-│    │  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌────────────┐  │   │
-│    │  │dim_client    │ │dim_datetime  │ │dim_weather   │ │fact_energy │  │   │
-│    │  │(has_solar,   │ │(tarifa 2.0TD,│ │(desc. modal  │ │_forecast   │  │   │
-│    │  │ has_battery) │ │ festivos)    │ │ por ID)      │ │(multi-JOIN)│  │   │
-│    │  └──────────────┘ └──────────────┘ └──────────────┘ └────────────┘  │   │
-│    └───────────────────────────────────────────────────────────────────────┘   │
+│    ┌─────▼───────────────────────────────────────────────────────────────────┐   │
+│    │  ETAPA 6 — CAPA GOLD (Esquema en estrella, reconstrucción atómica)      │   │
+│    │  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌────────────┐      │   │
+│    │  │dim_client    │ │dim_datetime  │ │dim_weather   │ │fact_energy │      │   │
+│    │  │(has_solar,   │ │(tarifa 2.0TD,│ │(desc. modal  │ │_forecast   │      │   │
+│    │  │ has_battery) │ │ festivos)    │ │ por ID)      │ │(multi-JOIN)│      │   │
+│    │  └──────────────┘ └──────────────┘ └──────────────┘ └────────────┘      │   │
+│    └─────────────────────────────────────────────────────────────────────────┘   │
 │                                                                                  │
 │  ┌─────────────────────────────────────────────────────────────────────────────┐ │
-│  │  TRANSVERSALES: config_paths.py · logger_config.py · audit_metadata.py    │ │
+│  │  TRANSVERSALES: config_paths.py · logger_config.py · audit_metadata.py      │ │
 │  └─────────────────────────────────────────────────────────────────────────────┘ │
 └──────────────────────────────────────────────────────────────────────────────────┘
 ```
