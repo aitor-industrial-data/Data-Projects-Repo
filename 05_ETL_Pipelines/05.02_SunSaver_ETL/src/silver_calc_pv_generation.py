@@ -11,221 +11,210 @@ from logger_config import setup_logging
 logger = setup_logging()
 
 
-def get_merged_silver_data(table_name_1: str = 'clean_clients', table_name_2: str = 'clean_weather') -> pd.DataFrame:
-    """
-    Extrae solo las ultimas lecturas de cada cliente y las devuelve como DataFrame.
-    """
-    try:
-        db_path = config_paths.get_db_path()
+# ─────────────────────────────────────────────────────────────────────────────
+# EXTRACT
+# ─────────────────────────────────────────────────────────────────────────────
 
-        # Obtenemos el timestamp actual en segundos (Unix Time)
-        now_unix = int(datetime.now(timezone.utc).timestamp())
-        
-        # 1. Conexión a la DB (usando str por seguridad de tipos)
+def get_merged_silver_data(
+    table_name_1: str = "clean_clients",
+    table_name_2: str = "clean_weather",
+) -> pd.DataFrame:
+    """
+    Joins clients and weather data for the active forecast window
+    (unix_time >= now) and returns the merged DataFrame.
+    """
+    db_path  = config_paths.get_db_path()
+    now_unix = int(datetime.now(timezone.utc).timestamp())
+
+    logger.info(
+        "[EXTRACT] Querying active window from '%s' ⨝ '%s' (unix_time >= %d)",
+        table_name_1, table_name_2, now_unix,
+    )
+
+    try:
         with sqlite3.connect(str(db_path)) as conn:
-            # 2. Leemos la tabla entera directamente a un DataFrame
             query = f"""
             SELECT c.*,
-                w.unix_time,
-                w.forecast_time_utc,
-                w.temp_celsius,          
-                w.humidity_pct,        
-                w.clouds_pct,        
-                w.rain_prob_norm,        
-                w.wind_speed_mps,          
-                w.weather_id,          
-                w.weather_main,           
-                w.weather_description,
-                w.is_daylight             
+                   w.unix_time,
+                   w.forecast_time_utc,
+                   w.temp_celsius,
+                   w.humidity_pct,
+                   w.clouds_pct,
+                   w.rain_prob_norm,
+                   w.wind_speed_mps,
+                   w.weather_id,
+                   w.weather_main,
+                   w.weather_description,
+                   w.is_daylight
             FROM {table_name_1} AS c
             INNER JOIN {table_name_2} AS w ON c.client_id = w.client_id
             WHERE w.unix_time >= {now_unix}
             """
             df = pd.read_sql_query(query, conn)
-            
-        logger.info(f"✅ Extracción exitosa: {len(df)} registros extraidos de ventana activa de DB")
+
+        logger.info("[EXTRACT] %d row(s) fetched from active forecast window", len(df))
         return df
 
-    except Exception as e:
-        logger.error(f"❌ Error extrayendo de DB: {e}")
-        return pd.DataFrame() # Devolvemos un DF vacío si falla
-    
-
-
-def transform_pv_generation(df_raw: pd.DataFrame) -> pd.DataFrame:
-    """
-    Calculo energetico
-    """
-    try:
-        if df_raw.empty:
-            return pd.DataFrame()
-            
-        df = df_raw.copy()
-        
-        data_to_clean = []
-        
-        for index, row in df.iterrows(): 
-            # 1. Calcular la posición del sol (altura y dirección) para el instante dado
-            alfa, azimuth  = pvgen.calculate_solar_position(row['latitude'],row['longitude'],row['forecast_time_utc'])
-            
-            # 2. Aplicas el "Candado de Ingeniería": Filtro de elevación mínima
-            # Se usa < 2° porque cerca del horizonte los modelos físicos pierden precisión
-            if alfa < 2:
-                ghi = 0.0
-                dni = 0.0
-                dhi = 0.0
-                poa = 0.0
-                p_gen = 0.0
-                pr = 0.0 
-                t_cell = row['temp_celsius']
-                p_con = pvgen.calculate_industrial_consumption(row['forecast_time_utc'], row['nominal_load_kw'], row['temp_celsius'])
-            else:
-               # Si el sol está lo suficientemente alto para generar energía y cálculos fiables:
-                
-                # 1. Estimar la Radiación Global Horizontal (GHI) ajustada por nubosidad y tipo de fenómeno (Weather ID)
-                ghi = pvgen.calculate_ghi(alfa, row['clouds_pct'], row['weather_id'])
-                
-                # 2. Descomponer la GHI en sus vectores Directo (DNI) y Difuso (DHI) mediante el modelo de Erbs
-                dni, dhi = pvgen.decompose_erbs(ghi, alfa, row['forecast_time_utc'])
-                
-                # 3. Transponer las componentes al plano del panel (POA) considerando ángulo, orientación y albedo
-                poa = pvgen.calculate_total_poa(dni, dhi, ghi, alfa, azimuth, row['angle'], row['aspect'])
-                
-                # 4. Calcular la temperatura de operación de la célula (Tcell) integrando el enfriamiento por convección (Viento)
-                t_cell = pvgen.calculate_t_cell(row['temp_celsius'], row['wind_speed_mps'], poa)
-                
-                # 5. Calcular la potencia final (AC/DC) aplicando coeficientes de temperatura y pérdidas de eficiencia del sistema
-                p_gen, pr = pvgen.calculate_power_output(poa, t_cell, row['pv_peak_power_kw'], row['loss_pct'])
-                
-                # 6. Simula el consumo dinámico: aplica curvas de carga horarias y el incremento de potencia por refrigeración ante altas temperaturas.
-                p_con = pvgen.calculate_industrial_consumption(row['forecast_time_utc'], row['nominal_load_kw'], row['temp_celsius'])
-            
-            entry = {
-                'client_id': row['client_id'],
-                'unix_time': row['unix_time'],
-                'forecast_time_utc': row['forecast_time_utc'],
-                't_cell_celsius': round(t_cell,3),
-                'poa_wm2': round(poa, 3),
-                'pv_power_gen_kw': round(p_gen, 3),
-                'pv_performance_ratio': round(pr, 3),
-                'power_con_kw': round(p_con, 3),
-                'calculated_at_utc': datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
-                }
-            
-            data_to_clean.append(entry)
-            
-        df = pd.DataFrame(data_to_clean)
-        
-        return df
-    
-    
-    except Exception as e:
-        logger.error(f"❌ Error en el motor de cálculo PV: {e}")
+    except Exception as exc:
+        logger.error("[EXTRACT] Failed to query Silver tables: %s", exc)
         return pd.DataFrame()
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# TRANSFORM
+# ─────────────────────────────────────────────────────────────────────────────
+
+def transform_pv_generation(df_raw: pd.DataFrame) -> pd.DataFrame:
+    """
+    Runs the physical PV simulation engine row-by-row over the merged dataset
+    and returns a DataFrame of calculated energy metrics.
+    """
+    if df_raw.empty:
+        logger.warning("[TRANSFORM] Input DataFrame is empty — skipping PV calculation")
+        return pd.DataFrame()
+
+    logger.info("[TRANSFORM] Running PV engine on %d record(s)", len(df_raw))
+
+    results = []
+
+    try:
+        for _, row in df_raw.iterrows():
+            alfa, azimuth = pvgen.calculate_solar_position(
+                row["latitude"], row["longitude"], row["forecast_time_utc"]
+            )
+
+            if alfa < 2:                        # Sun below engineering threshold → no generation
+                ghi = dni = dhi = poa = p_gen = pr = 0.0
+                t_cell = row["temp_celsius"]
+                p_con  = pvgen.calculate_industrial_consumption(
+                    row["forecast_time_utc"], row["nominal_load_kw"], row["temp_celsius"]
+                )
+            else:
+                ghi        = pvgen.calculate_ghi(alfa, row["clouds_pct"], row["weather_id"])
+                dni, dhi   = pvgen.decompose_erbs(ghi, alfa, row["forecast_time_utc"])
+                poa        = pvgen.calculate_total_poa(
+                    dni, dhi, ghi, alfa, azimuth, row["angle"], row["aspect"]
+                )
+                t_cell     = pvgen.calculate_t_cell(row["temp_celsius"], row["wind_speed_mps"], poa)
+                p_gen, pr  = pvgen.calculate_power_output(
+                    poa, t_cell, row["pv_peak_power_kw"], row["loss_pct"]
+                )
+                p_con      = pvgen.calculate_industrial_consumption(
+                    row["forecast_time_utc"], row["nominal_load_kw"], row["temp_celsius"]
+                )
+
+            results.append({
+                "client_id":            row["client_id"],
+                "unix_time":            row["unix_time"],
+                "forecast_time_utc":    row["forecast_time_utc"],
+                "t_cell_celsius":       round(t_cell, 3),
+                "poa_wm2":              round(poa,    3),
+                "pv_power_gen_kw":      round(p_gen,  3),
+                "pv_performance_ratio": round(pr,     3),
+                "power_con_kw":         round(p_con,  3),
+                "calculated_at_utc":    datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
+            })
+
+        df_out = pd.DataFrame(results)
+        logger.info("[TRANSFORM] PV engine completed — %d calculations produced", len(df_out))
+        return df_out
+
+    except Exception as exc:
+        logger.error("[TRANSFORM] PV engine error: %s", exc)
+        return pd.DataFrame()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# LOAD → SILVER
+# ─────────────────────────────────────────────────────────────────────────────
+
 def load_generation_to_silver(df: pd.DataFrame, table_name: str = "clean_calculations") -> bool:
     """
-    Almacena los cálculos de rendimiento energético en la DB.
-    Usa PK compuesta (client_id, unix_time) para evitar duplicados en el histórico.
+    Upserts PV calculation results into Silver using a composite PK
+    (client_id, unix_time) to guarantee idempotency.
     """
     db_path = config_paths.get_db_path()
-    
-    try:
-        if df.empty:
-            logger.warning(f"⚠️  DataFrame de generación vacío para '{table_name}'.")
-            return False
 
-        # 1. Preparación de datos (Copia para no mutar el original)
+    if df.empty:
+        logger.warning("[LOAD] DataFrame is empty — nothing written to '%s'", table_name)
+        return False
+
+    logger.info("[LOAD] Upserting %d record(s) into '%s'", len(df), table_name)
+
+    try:
         df_sql = df.copy()
-        
-        # Aseguramos que forecast_time sea string si viene como datetime
-        if pd.api.types.is_datetime64_any_dtype(df_sql['forecast_time_utc']):
-            df_sql['forecast_time_utc'] = df_sql['forecast_time_utc'].dt.strftime('%Y-%m-%d %H:%M:%S')
+        if pd.api.types.is_datetime64_any_dtype(df_sql["forecast_time_utc"]):
+            df_sql["forecast_time_utc"] = df_sql["forecast_time_utc"].dt.strftime("%Y-%m-%d %H:%M:%S")
 
         engine = create_engine(f"sqlite:///{db_path}")
 
         with engine.begin() as connection:
-            # 2. Creación de tabla específica para GENERACIÓN
-            create_table_query = f"""
-            CREATE TABLE IF NOT EXISTS {table_name} (
-                client_id               TEXT NOT NULL,
-                unix_time               INTEGER NOT NULL,
-                forecast_time_utc       TEXT NOT NULL,
-                pv_power_gen_kw         REAL,
-                pv_performance_ratio    REAL,
-                poa_wm2                 REAL,
-                t_cell_celsius          REAL,
-                power_con_kw            REAL,
-                calculated_at_utc       TEXT NOT NULL,
-                PRIMARY KEY (client_id, unix_time)
-            )
-            """
-            connection.execute(text(create_table_query))
-            
-            # 3. UPSERT (Insert or Replace)
-            data = df_sql.to_dict(orient='records')
-            
-            # Construimos la query dinámicamente basada en las columnas del DF
-            columns = list(df_sql.columns)
+            connection.execute(text(f"""
+                CREATE TABLE IF NOT EXISTS {table_name} (
+                    client_id               TEXT    NOT NULL,
+                    unix_time               INTEGER NOT NULL,
+                    forecast_time_utc       TEXT    NOT NULL,
+                    pv_power_gen_kw         REAL,
+                    pv_performance_ratio    REAL,
+                    poa_wm2                 REAL,
+                    t_cell_celsius          REAL,
+                    power_con_kw            REAL,
+                    calculated_at_utc       TEXT    NOT NULL,
+                    PRIMARY KEY (client_id, unix_time)
+                )
+            """))
+
+            columns      = list(df_sql.columns)
             placeholders = [f":{col}" for col in columns]
-            
-            upsert_query = text(f"""
-                INSERT OR REPLACE INTO {table_name} 
-                ({', '.join(columns)}) 
-                VALUES ({', '.join(placeholders)})
-            """)
-            
-            connection.execute(upsert_query, data)
-        
-        logger.info(f"✅ Generación guardada en SQL: {len(df)} registros en '{table_name}'.")
+            connection.execute(
+                text(f"""
+                    INSERT OR REPLACE INTO {table_name}
+                    ({', '.join(columns)})
+                    VALUES ({', '.join(placeholders)})
+                """),
+                df_sql.to_dict(orient="records"),
+            )
+
+        logger.info("[LOAD] %d record(s) written to '%s'", len(df), table_name)
         return True
 
-    except Exception as e:
-        logger.error(f"❌ Error cargando generación a Silver: {e}")
+    except Exception as exc:
+        logger.error("[LOAD] Failed to write to '%s': %s", table_name, exc)
         return False
 
 
-def extract_generation_data() -> int: 
+# ─────────────────────────────────────────────────────────────────────────────
+# ORCHESTRATOR ENTRY POINT
+# ─────────────────────────────────────────────────────────────────────────────
+
+def extract_generation_data() -> int:
     """
-    Orquestador del motor de cálculo: 
-    Extrae datos combinados, calcula métricas PV y carga en Silver/Gold.
-    Devuelve el número de cálculos realizados.
+    Module entry point: extract merged Silver data → run PV engine → load results.
+    Returns the number of calculation records written (0 on failure).
     """
-    try:
-        # 1. Extracción (Obtenemos el cruce de Clientes + Clima)
-        df_merged = get_merged_silver_data()
-        
-        if df_merged.empty:
-            logger.warning("No hay datos nuevos para calcular generación.")
-            return 0
+    logger.info("[INIT] ── extract_generation_data starting ──────────────────")
 
-        # 2. Transformación (Cálculos físicos del motor PV)
-        df_calculated = transform_pv_generation(df_merged)
-        
-        if df_calculated.empty:
-            return 0
-
-        # Guardamos cuántos cálculos se han realizado con éxito
-        total_calculations = len(df_calculated)
-
-        # 3. Carga (Persistencia en la tabla de resultados)
-        success = load_generation_to_silver(df_calculated)
-        
-        if success:
-            logger.info(f"🚀 Pipeline de Generación finalizado: {total_calculations} cálculos inyectados.")
-            logger.info(f"Datos totales procesados: {total_calculations}")
-            return total_calculations
-        
+    df_merged = get_merged_silver_data()
+    if df_merged.empty:
+        logger.warning("[INIT] No active forecast data found — nothing to calculate")
         return 0
 
-    except Exception as e:
-        logger.error(f"❌ Error crítico en extract_generation_data: {e}")
+    df_calculated = transform_pv_generation(df_merged)
+    if df_calculated.empty:
+        logger.error("[TRANSFORM] PV engine returned no results — aborting load")
         return 0
 
+    total = len(df_calculated)
+
+    if load_generation_to_silver(df_calculated):
+        logger.info("[DONE] extract_generation_data finished — calculations written: %d", total)
+        return total
+
+    logger.error("[DONE] Load step failed — 0 records committed")
+    return 0
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-
-    logger.info(f"Iniciando extracción e ingesta de cálculos de rendimiento...")
     extract_generation_data()
-    

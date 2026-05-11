@@ -9,150 +9,175 @@ from typing import Optional, Union
 import config_paths
 from logger_config import setup_logging
 
-# ── Logging ───────────────────────────────────────────────────────────────────
-logger = setup_logging()
 
-# ── Configuración ─────────────────────────────────────────────────────────────
+logger = setup_logging()
 load_dotenv()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# EXTRACT
+# ─────────────────────────────────────────────────────────────────────────────
 
 def extract_raw_json_from_ree() -> Union[dict, bool]:
     """
-    Extrae precios PVPC (id=1001) de mañana de la API de Red Eléctrica.
-    Retorna el diccionario de datos o False si no hay disponibilidad o hay error.
+    Fetches tomorrow's PVPC prices (id=1001) from Red Eléctrica de España.
+    Returns the raw API payload or False when data is not yet published.
     """
     tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
 
+    url = (
+        "https://apidatos.ree.es/es/datos/mercados/precios-mercados-tiempo-real"
+        f"?start_date={tomorrow}T00:00&end_date={tomorrow}T23:59"
+        "&time_trunc=hour&geo_trunc=electric_system"
+        "&geo_limit=peninsular&geo_ids=8741"
+    )
+    headers = {
+        "Accept":   "application/json",
+        "Origin":   "https://www.ree.es",
+        "Referer":  "https://www.ree.es/",
+    }
+
+    logger.info("[EXTRACT] Requesting PVPC prices for %s from REE API", tomorrow)
+
     try:
-        url = (
-            "https://apidatos.ree.es/es/datos/mercados/precios-mercados-tiempo-real"
-            f"?start_date={tomorrow}T00:00&end_date={tomorrow}T23:59"
-            "&time_trunc=hour&geo_trunc=electric_system"
-            "&geo_limit=peninsular&geo_ids=8741"
-        )
-        headers = {
-            "Accept": "application/json",
-            "Origin": "https://www.ree.es",
-            "Referer": "https://www.ree.es/",
-        }
-        
         response = requests.get(url, headers=headers, timeout=15)
         response.raise_for_status()
         all_data = response.json()
 
-        # Filtrar solo el ID 1001 (PVPC)
         pvpc_item = next(
-            (item for item in all_data.get("included", [])
-             if item.get("id") == "1001"),
-            None
+            (item for item in all_data.get("included", []) if item.get("id") == "1001"),
+            None,
         )
 
         if pvpc_item and pvpc_item["attributes"].get("values"):
-            logger.info(f"✅ PVPC extraído correctamente para {tomorrow}")
+            n_values = len(pvpc_item["attributes"]["values"])
+            logger.info("[EXTRACT] PVPC data retrieved — %d hourly values for %s", n_values, tomorrow)
             all_data["included"] = [pvpc_item]
             return all_data
 
-        # Si llegamos aquí, REE no tiene los precios publicados todavía
-        logger.warning(f"⚠️ REE no devolvió precios para {tomorrow}. (Probable: antes de las 20:30h)")
+        logger.warning(
+            "[EXTRACT] REE returned no PVPC values for %s "
+            "(prices are typically published after 20:30 CET)",
+            tomorrow,
+        )
         return False
 
-    except requests.exceptions.HTTPError as e:
+    except requests.exceptions.HTTPError as exc:
         code = response.status_code
         if code in (500, 502, 503, 504):
-            logger.error(f"⚠️ Servidor REE no disponible ({code}). Precios aún no publicados.")
+            logger.error("[EXTRACT] REE server unavailable (HTTP %d) — prices not yet published", code)
         else:
-            logger.error(f"❌ Error HTTP en REE: {e}")
+            logger.error("[EXTRACT] Unexpected HTTP error from REE (HTTP %d): %s", code, exc)
         return False
 
-    except Exception as e:
-        logger.error(f"❌ Error inesperado conectando con REE: {e}")
+    except Exception as exc:
+        logger.error("[EXTRACT] Unexpected error contacting REE API: %s", exc)
         return False
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# INGEST → BRONZE
+# ─────────────────────────────────────────────────────────────────────────────
 
 def ingest_ree_to_bronze(api_response: dict) -> Optional[str]:
     """
-    Capa Bronze: Guarda el JSON original con permisos de solo lectura.
+    Persists the raw REE payload to the Bronze layer as an immutable JSON file
+    (chmod 444) and returns the absolute path for lineage tracking.
     """
+    bronze_dir = config_paths.get_bronze_path()
+    os.makedirs(bronze_dir, exist_ok=True)
+
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    filename  = f"prices_{timestamp}.json"
+    full_path = os.path.join(bronze_dir, filename)
+
+    logger.info("[BRONZE] Writing REE payload → %s", filename)
+
     try:
-        bronze_dir = config_paths.get_bronze_path()
-        os.makedirs(bronze_dir, exist_ok=True)
+        with open(full_path, "w", encoding="utf-8") as fh:
+            json.dump(api_response, fh, ensure_ascii=False, indent=4)
 
-        timestamp = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')
-        filename = f"prices_{timestamp}.json"
-        full_path = os.path.join(bronze_dir, filename)
-
-        with open(full_path, 'w', encoding='utf-8') as f:
-            json.dump(api_response, f, ensure_ascii=False, indent=4)
-
-        # Blindaje chmod 444
-        os.chmod(full_path, stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH)
-        logger.info(f"🔒 Archivo Bronze blindado: {filename}")
-        
+        os.chmod(full_path, stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH)   # 444 — immutable
+        logger.info("[BRONZE] File sealed (chmod 444): %s", filename)
         return full_path
 
-    except Exception as e:
-        logger.error(f"❌ Error en persistencia Bronze: {e}")
+    except Exception as exc:
+        logger.error("[BRONZE] Persistence failed for %s: %s", filename, exc)
         return None
 
-def extract_energy_prices() -> Union[int, bool]: 
-    """
-    Orquestador del módulo REE.
-    RETORNA: 
-        - int: Cantidad de registros (filas) si todo es correcto.
-        - False: Si el proceso debe marcarse como fallido/incompleto en el orquestador principal.
-    """
-    try:
-        # 1. Extracción con validación de disponibilidad
-        raw_prices = extract_raw_json_from_ree()
-        
-        
-        # SI REE NO DA DATOS, DEVOLVEMOS FALSE
-        # Esto hará que el orquestador principal marque 'PARTIAL SUCCESS' y registre el fallo
-        if raw_prices is False:
-            return False 
 
-        # 2. Conteo de volumen de datos
+# ─────────────────────────────────────────────────────────────────────────────
+# MANIFEST
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _update_manifest(bronze_dir: str, path_file: str) -> None:
+    """Appends a new 'pending' entry to the REE process manifest."""
+    manifest_path = os.path.join(bronze_dir, "_process_manifest_ree.json")
+
+    new_task = {
+        "source":     "REE",
+        "path":       path_file,
+        "status":     "pending",
+        "created_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
+        "updated_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
+    }
+
+    all_tasks: list = []
+    if os.path.exists(manifest_path):
         try:
-            total_hours = len(raw_prices["included"][0]["attributes"]["values"])
-        except (KeyError, IndexError):
-            logger.error("❌ Formato de datos de REE irreconocible.")
-            return False
+            with open(manifest_path, "r", encoding="utf-8") as fh:
+                all_tasks = json.load(fh)
+        except Exception:
+            logger.warning("[MANIFEST] Could not parse existing REE manifest — starting fresh")
 
-        # 3. Persistencia en Bronze
-        path_file = ingest_ree_to_bronze(raw_prices)
-        if not path_file:
-            return False
+    all_tasks.append(new_task)
 
-        # 4. Actualización del Manifiesto de Procesamiento
-        new_extraction = {
-            'source': 'REE',
-            'path': path_file,
-            'status': 'pending',
-            'created_at': datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S'),
-            'updated_at': datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
-        }
+    with open(manifest_path, "w", encoding="utf-8") as fh:
+        json.dump(all_tasks, fh, indent=4, ensure_ascii=False)
 
-        bronze_dir = config_paths.get_bronze_path()
-        manifest_path = os.path.join(bronze_dir, "_process_manifest_ree.json")
+    pending = sum(1 for t in all_tasks if t["status"] == "pending")
+    logger.info("[MANIFEST] REE manifest updated — pending tasks: %d", pending)
 
-        all_tasks = []
-        if os.path.exists(manifest_path):
-            try:
-                with open(manifest_path, 'r', encoding='utf-8') as f:
-                    all_tasks = json.load(f)
-            except Exception:
-                all_tasks = []
 
-        all_tasks.append(new_extraction)
+# ─────────────────────────────────────────────────────────────────────────────
+# ORCHESTRATOR ENTRY POINT
+# ─────────────────────────────────────────────────────────────────────────────
 
-        with open(manifest_path, 'w', encoding='utf-8') as f:
-            json.dump(all_tasks, f, indent=4, ensure_ascii=False)
-        
-        logger.info(f"📊 ETL REE: {total_hours} registros inyectados en Bronze.")
-        return total_hours 
+def extract_energy_prices() -> Union[int, bool]:
+    """
+    Module entry point: fetch PVPC → ingest to Bronze → update manifest.
 
-    except Exception as e:
-        logger.critical(f"❌ Fallo catastrófico en extract_energy_prices: {e}")
+    Returns:
+        int  — number of hourly price records ingested on success.
+        False — when REE data is unavailable or a critical error occurs,
+                signalling the orchestrator to mark the run as PARTIAL SUCCESS.
+    """
+    logger.info("[INIT] ── extract_energy_prices starting ────────────────────")
+
+    raw_prices = extract_raw_json_from_ree()
+    if raw_prices is False:
+        logger.warning("[INIT] No REE data available — signalling PARTIAL SUCCESS to orchestrator")
         return False
 
+    try:
+        total_hours = len(raw_prices["included"][0]["attributes"]["values"])
+    except (KeyError, IndexError):
+        logger.error("[EXTRACT] Unrecognised REE payload structure — cannot count records")
+        return False
+
+    path_file = ingest_ree_to_bronze(raw_prices)
+    if not path_file:
+        logger.error("[BRONZE] Ingestion failed — aborting")
+        return False
+
+    bronze_dir = config_paths.get_bronze_path()
+    _update_manifest(str(bronze_dir), path_file)
+
+    logger.info("[DONE] extract_energy_prices finished — hourly records ingested: %d", total_hours)
+    return total_hours
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+
 if __name__ == "__main__":
-    # Ejecución manual para pruebas
     extract_energy_prices()

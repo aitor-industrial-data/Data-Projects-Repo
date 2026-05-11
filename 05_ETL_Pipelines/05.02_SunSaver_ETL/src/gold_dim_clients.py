@@ -1,25 +1,29 @@
 import sqlalchemy
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
+
 import config_paths
 from logger_config import setup_logging
 
-# Configuración de logs y base de datos
+
 logger = setup_logging()
 DB_PATH = config_paths.get_db_path()
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# BUILD
+# ─────────────────────────────────────────────────────────────────────────────
+
 def build_dim_client(engine: sqlalchemy.engine.Engine) -> int:
     """
-    Genera gold_dim_client a partir de clean_clients aplicando lógica de negocio.
-    Retorna el número de filas insertadas utilizando SQLAlchemy.
+    Rebuilds gold_dim_client from clean_clients, deriving has_solar and
+    has_battery boolean flags.  Returns the number of rows inserted.
     """
-    try:
-        logger.info("Generando gold_dim_client a partir de clean_clients (SQLAlchemy)...")
+    logger.info("[INIT] ── build_dim_client starting ────────────────────────")
 
-        # Usamos un bloque 'with engine.begin()' para manejar la transacción automáticamente
+    try:
         with engine.begin() as conn:
-            # 1. Extraer datos de la capa Silver
-            query_select = text("""
+            rows = conn.execute(text("""
                 SELECT
                     client_id, name, description, latitude, longitude, timezone,
                     nominal_load_kw, pv_peak_power_kw, panel_area_m2,
@@ -27,49 +31,45 @@ def build_dim_client(engine: sqlalchemy.engine.Engine) -> int:
                     battery_capacity_kwh, soc_min_pct, installation_cost_eur
                 FROM clean_clients
                 ORDER BY client_id
-            """)
-            
-            result = conn.execute(query_select)
-            rows = result.fetchall()
+            """)).fetchall()
 
-            if not rows:
-                logger.warning("clean_clients está vacía — no se generó gold_dim_client")
-                return 0
+        if not rows:
+            logger.warning("[EXTRACT] clean_clients is empty — gold_dim_client not generated")
+            return 0
 
-            # 2. Procesar lógica de negocio y campos derivados
-            registros = []
-            for row in rows:
-                # Acceso por nombre de columna (más seguro que índices en SQLAlchemy)
-                has_solar = 1 if (row.pv_peak_power_kw or 0) > 0 else 0
-                has_battery = 1 if (row.battery_capacity_kwh or 0) > 0 else 0
+        logger.info("[EXTRACT] %d client(s) read from clean_clients", len(rows))
 
-                registros.append({
-                    "client_id": row.client_id,
-                    "name": row.name,
-                    "description": row.description,
-                    "latitude": row.latitude,
-                    "longitude": row.longitude,
-                    "timezone": row.timezone,
-                    "nominal_load_kw": row.nominal_load_kw,
-                    "pv_peak_power_kw": row.pv_peak_power_kw,
-                    "panel_area_m2": row.panel_area_m2,
-                    "efficiency": row.efficiency,
-                    "panel_type": row.panel_type,
-                    "loss_pct": row.loss_pct,
-                    "angle": row.angle,
-                    "aspect": row.aspect,
-                    "mounting": row.mounting,
-                    "battery_capacity_kwh": row.battery_capacity_kwh,
-                    "soc_min_pct": row.soc_min_pct,
-                    "installation_cost_eur": row.installation_cost_eur,
-                    "has_solar": has_solar,
-                    "has_battery": has_battery
-                })
+        registros = [
+            {
+                "client_id":             r.client_id,
+                "name":                  r.name,
+                "description":           r.description,
+                "latitude":              r.latitude,
+                "longitude":             r.longitude,
+                "timezone":              r.timezone,
+                "nominal_load_kw":       r.nominal_load_kw,
+                "pv_peak_power_kw":      r.pv_peak_power_kw,
+                "panel_area_m2":         r.panel_area_m2,
+                "efficiency":            r.efficiency,
+                "panel_type":            r.panel_type,
+                "loss_pct":              r.loss_pct,
+                "angle":                 r.angle,
+                "aspect":                r.aspect,
+                "mounting":              r.mounting,
+                "battery_capacity_kwh":  r.battery_capacity_kwh,
+                "soc_min_pct":           r.soc_min_pct,
+                "installation_cost_eur": r.installation_cost_eur,
+                "has_solar":             1 if (r.pv_peak_power_kw or 0) > 0 else 0,
+                "has_battery":           1 if (r.battery_capacity_kwh or 0) > 0 else 0,
+            }
+            for r in rows
+        ]
 
-            # 3. Recrear la tabla en la capa Gold
+        logger.info("[TRANSFORM] Derived flags computed for %d client(s)", len(registros))
+
+        with engine.begin() as conn:
             conn.execute(text("DROP TABLE IF EXISTS gold_dim_client"))
-            
-            create_table_query = text("""
+            conn.execute(text("""
                 CREATE TABLE gold_dim_client (
                     client_id               TEXT    PRIMARY KEY,
                     name                    TEXT    NOT NULL,
@@ -92,11 +92,8 @@ def build_dim_client(engine: sqlalchemy.engine.Engine) -> int:
                     has_solar               INTEGER NOT NULL,
                     has_battery             INTEGER NOT NULL
                 )
-            """)
-            conn.execute(create_table_query)
-
-            # 4. Inserción masiva usando diccionarios (estilo SQLAlchemy core)
-            insert_query = text("""
+            """))
+            conn.execute(text("""
                 INSERT INTO gold_dim_client (
                     client_id, name, description, latitude, longitude, timezone,
                     nominal_load_kw, pv_peak_power_kw, panel_area_m2,
@@ -110,33 +107,35 @@ def build_dim_client(engine: sqlalchemy.engine.Engine) -> int:
                     :battery_capacity_kwh, :soc_min_pct, :installation_cost_eur,
                     :has_solar, :has_battery
                 )
-            """)
-            
-            conn.execute(insert_query, registros)
-            
-            total_filas = len(registros)
-            logger.info(f"✅ gold_dim_client generada: {total_filas} filas insertadas")
-            logger.info(f"Datos totales procesados: {total_filas}")
-            return total_filas
+            """), registros)
 
-    except SQLAlchemyError as e:
-        logger.error(f"❌ Error de SQLAlchemy en build_dim_client: {e}")
-        # engine.begin() hace rollback automático si hay una excepción
-        raise 
-    except Exception as e:
-        logger.error(f"❌ Error inesperado: {e}")
+        total = len(registros)
+        logger.info("[DONE] gold_dim_client rebuilt — rows inserted: %d", total)
+        return total
+
+    except SQLAlchemyError as exc:
+        logger.error("[ERROR] SQLAlchemy error in build_dim_client: %s", exc)
+        raise
+    except Exception as exc:
+        logger.error("[ERROR] Unexpected error in build_dim_client: %s", exc)
         raise
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# ORCHESTRATOR ENTRY POINT
+# ─────────────────────────────────────────────────────────────────────────────
+
 def load_dim_client() -> int:
-    """Maneja la creación del motor y el flujo principal."""
+    """Module entry point. Returns the number of rows written (0 on failure)."""
     try:
-        # Creamos el engine (usamos el path nativo de Ubuntu que tienes configurado)
         engine = create_engine(f"sqlite:///{DB_PATH}")
         return build_dim_client(engine)
-    except Exception as e:
-        logger.critical(f"Hubo un fallo crítico en el proceso de carga: {e}")
+    except Exception as exc:
+        logger.critical("[ERROR] Critical failure in load_dim_client: %s", exc)
         return 0
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     load_dim_client()

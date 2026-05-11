@@ -63,5 +63,3 @@ def get_bronze_path() -> Path:
     final_path.parent.mkdir(parents=True, exist_ok=True)
     
     return final_path.resolve()
-
-    
