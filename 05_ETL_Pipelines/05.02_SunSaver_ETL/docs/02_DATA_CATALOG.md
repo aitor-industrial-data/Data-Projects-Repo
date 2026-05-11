@@ -1,5 +1,5 @@
-# ☀️ SunSaver ETL — Catálogo de Datos
-# 02 CATALOGO DE DATOS
+# ☀️ SunSaver ETL · Plataforma de Inteligencia Energética Industrial
+# 02 Catalogo de datos
 
 > **Clasificación:** INTERNA &nbsp;|&nbsp; **Estado:** ACTIVO — Entorno DEV &nbsp;|&nbsp; **Pipeline:** `SunSaver_ETL`  
 > **Propietario:** Equipo de Datos — SunSaver &nbsp;|&nbsp; **Última actualización:** 2026-05-11

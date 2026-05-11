@@ -24,9 +24,6 @@ def extract_weather(lat: float, lon: float) -> Dict[str, Any]:
     """Calls the OpenWeatherMap 5-day/3-hour forecast endpoint for one location."""
     API_KEY = os.getenv("WEATHER_API_KEY")
 
-    if not API_KEY:
-        logger.error("[EXTRACT] WEATHER_API_KEY is not set in the environment — check .env")
-        return {}
 
     params = {
         "lat":   lat,
@@ -126,6 +123,11 @@ def extract_openweather(client_table: str = "clean_clients") -> int:
     Returns the number of Bronze files successfully created (0 on failure).
     """
     logger.info("[INIT] ── extract_openweather starting ──────────────────────")
+
+    API_KEY = os.getenv("WEATHER_API_KEY")
+    if not API_KEY:
+        logger.error("[EXTRACT] WEATHER_API_KEY is not set — check .env")
+        return False
 
     db_path = config_paths.get_db_path()
 
