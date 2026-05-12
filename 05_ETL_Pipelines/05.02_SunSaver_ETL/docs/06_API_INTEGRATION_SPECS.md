@@ -65,7 +65,7 @@ INT-003 Excel clientes ──────► clean_clients ───────
 INT-002 OpenWeatherMap ──────► clean_weather ─────────────► Generación PV por hora
          (CRÍTICA)             + clean_calculations          Consumo estimado por hora
          llamada por                 │
-         cada client_id             │
+         cada client_id              │
                                      ▼
 INT-001 REE PVPC ────────────► clean_prices ──────────────► Coste/ahorro por hora
          (ALTA)                      │                        Decisión de carga batería
