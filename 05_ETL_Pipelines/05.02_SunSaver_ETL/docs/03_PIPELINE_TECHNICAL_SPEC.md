@@ -2,7 +2,7 @@
 ## 03 Especificación Técnica del Pipeline
 
 > **Clasificación:** INTERNA &nbsp;|&nbsp; **Estado:** ACTIVO — Entorno DEV &nbsp;|&nbsp; **Pipeline:** `SunSaver_ETL`  
-> **Propietario técnico:** Equipo de Data Engineering — SunSaver &nbsp;|&nbsp; **Última actualización:** 2026-05-10
+> **Propietario técnico:** Equipo de Data Engineering — SunSaver &nbsp;|&nbsp; **Última actualización:** 2026-05-11
 
 ---
 
