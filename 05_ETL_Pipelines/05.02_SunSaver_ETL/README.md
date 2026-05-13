@@ -14,19 +14,28 @@
 ![pvlib](https://img.shields.io/badge/pvlib-0.11-F7931E?style=flat-square)
 ![Pipeline](https://img.shields.io/badge/Pipeline-6%20stages-22C55E?style=flat-square)
 ![Architecture](https://img.shields.io/badge/Architecture-Medallion-8B5CF6?style=flat-square)
+![Docs](https://img.shields.io/badge/Docs-8%20documentos-0EA5E9?style=flat-square)
 ![License](https://img.shields.io/badge/License-MIT-6B7280?style=flat-square)
 
-**Pipeline ETL de predicción energética solar para instalaciones industriales fotovoltaicas.**
+**Plataforma de inteligencia energética industrial: física solar + mercado eléctrico + datos operativos, en un pipeline ETL con horizonte de 5 días y granularidad horaria.**
 
 </div>
 
 ---
 
-## 01 · Descripción del proyecto
+## 01 · El problema que resuelve
 
-SunSaver es un pipeline ETL de producción que ingiere datos meteorológicos en tiempo real (OpenWeatherMap), precios horarios del mercado eléctrico español (REE/PVPC) y parámetros de instalación por cliente, para generar **predicciones de generación fotovoltaica y consumo industrial** en un horizonte de 5 días. El resultado alimenta un modelo de datos dimensional (Gold) listo para reporting o toma de decisiones de optimización energética.
+Una PYME industrial con instalación fotovoltaica toma hoy sus decisiones energéticas a ciegas. No sabe cuánta energía va a generar mañana, ni cuánto costará la red en cada franja horaria, ni si tiene sentido arrancar la prensa a las 10h o esperar a las 14h. Esa incertidumbre tiene un precio concreto: **cargar baterías en hora punta, arrancar maquinaria con déficit solar y perder el arbitraje entre generación propia y red**.
 
-Diseñado para escalar de 1 a N instalaciones sin cambios en el código: añadir un cliente nuevo al Excel de origen es suficiente.
+SunSaver elimina esa incertidumbre. Integra previsión meteorológica (OpenWeatherMap), precios horarios del mercado eléctrico español (REE/PVPC) y los parámetros físicos de cada instalación para producir, hora a hora y con 5 días de antelación, una respuesta accionable a la pregunta que importa:
+
+> *«Dado lo que sé sobre el sol, el tiempo y el precio de la luz — ¿cuándo debo arrancar mis máquinas, cuándo cargar mis baterías y cuándo es mejor comprar energía de la red?»*
+
+| Caso de uso | Horizonte | Impacto económico |
+|---|---|---|
+| **Programación de maquinaria pesada** | 24–48 h | Elegir horas de alta generación PV + precio bajo |
+| **Carga óptima de baterías** | 5–24 h | Cargar en excedente PV + valle; descargar en punta |
+| **Gestión de cargas diferibles** | 5 días | Mover consumos no urgentes a ventanas de menor coste neto |
 
 ---
 
@@ -40,35 +49,34 @@ Diseñado para escalar de 1 a N instalaciones sin cambios en el código: añadir
                 │                     │                        │
                 ▼                     ▼                        ▼
 ┌──────────────────────────────────────────────────────────────────────────────┐
-│  STAGE 1 · BRONZE  ── Raw ingestion · JSON inmutable (chmod 444)             │
-│  bronze_ingest_clients  ·  bronze_ingest_prices_ree  ·  bronze_ingest_weather│
+│  STAGE 1–2 · BRONZE  ── Ingesta raw · JSON inmutable (chmod 444)             │
 │  Process manifests por fuente · trazabilidad completa de archivos            │
 └───────────────────────────────────┬──────────────────────────────────────────┘
                                     │
                                     ▼
 ┌──────────────────────────────────────────────────────────────────────────────┐
-│  STAGE 2–4 · SILVER  ── Validación · deduplicación · imputación              │
-│  silver_transform_clients  ·  silver_transform_prices  ·  silver_transform   │
-│  Tipos forzados · reglas de negocio · resampleo horario con interpolación    │
+│  STAGE 2–4 · SILVER  ── Validación · tipos · reglas de negocio               │
+│  Deduplicación · resampleo horario con interpolación · imputación            │
 └───────────────────────────────────┬──────────────────────────────────────────┘
                                     │
                                     ▼
 ┌──────────────────────────────────────────────────────────────────────────────┐
-│  STAGE 5 · FÍSICA PV  ── Motor de simulación físico (pvlib)                  │
-│  Posición solar · GHI/DNI/DHI · POA · T_cell Faiman · Potencia AC            │
-│  Modelo de consumo industrial con turnos + carga térmica + variabilidad      │
+│  STAGE 5 · MOTOR FÍSICO PV  ── pvlib                                         │
+│  Posición solar (NREL SPA) · GHI Haurwitz · Kasten-Czeplak · Erbs            │
+│  POA Liu-Jordan · T_cell Faiman · Potencia AC · Consumo industrial           │
 └───────────────────────────────────┬──────────────────────────────────────────┘
                                     │
                                     ▼
 ┌──────────────────────────────────────────────────────────────────────────────┐
-│  STAGE 6 · GOLD  ── Modelo dimensional para análisis y reporting             │
-│  dim_client · dim_datetime (tarifas P1-P6) · dim_weather · fact_energy       │
+│  STAGE 6 · GOLD  ── Star Schema Kimball · listo para BI                      │
+│  dim_client · dim_datetime (P1/P2/P3/P6) · dim_weather · fact_energy         │
 └──────────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
-                        📁 SQLite  ·  sunsaver.db
-                        📋 etl_metadata  (auditoría de ejecuciones)
+              📁 SQLite · sunsaver.db   +   📋 etl_metadata (auditoría)
 ```
+
+Cada fila de `gold_fact_energy_forecast` responde a: *«para esta instalación, en esta hora concreta, ¿cuánta energía se genera, cuánta se consume y cuánto cuesta?»*
 
 ---
 
@@ -77,24 +85,24 @@ Diseñado para escalar de 1 a N instalaciones sin cambios en el código: añadir
 | Herramienta | Versión | Rol en el proyecto |
 |---|---|---|
 | **Python** | 3.11+ | Lenguaje del pipeline completo |
-| **pvlib** | 0.11 | Cálculo de posición solar, GHI, Erbs, POA, Faiman |
+| **pvlib** | 0.11 | Geometría solar, GHI, descomposición Erbs, POA, modelo Faiman |
 | **pandas** | 2.x | Transformación, resampleo e imputación de datos |
-| **SQLAlchemy** | 2.x | ORM/core para escritura idempotente en SQLite |
-| **SQLite** | 3.x | Almacén analítico embebido (Bronze→Silver→Gold) |
+| **SQLAlchemy** | 2.x | Escritura idempotente en SQLite (upsert con clave compuesta) |
+| **SQLite** | 3.x | Almacén analítico embebido, portable, sin infraestructura |
 | **requests** | 2.x | Clientes HTTP para REE y OpenWeatherMap |
-| **python-dotenv** | 1.x | Gestión de secretos y configuración de entorno |
+| **python-dotenv** | 1.x | Gestión de secretos y variables de entorno |
 
 ---
 
 ## 04 · Funcionalidades principales
 
-- ✅ **Arquitectura Medallion completa** — Bronze → Silver → Gold con trazabilidad de linaje en cada capa
-- ✅ **Idempotente por diseño** — reejecutar el pipeline no duplica registros (upsert con clave compuesta en Silver y Gold)
-- ✅ **Motor físico PV de alta fidelidad** — irradiancia Haurwitz + Kasten-Czeplak + descomposición Erbs + modelo Faiman para temperatura de célula
-- ✅ **Resiliencia ante fallos parciales** — REE sin publicar precios devuelve `PARTIAL SUCCESS`, no aborta el pipeline
-- ✅ **Multi-cliente escalable** — el pipeline itera sobre todos los clientes activos; añadir uno no requiere cambios de código
-- ✅ **Auditoría automática** — cada ejecución persiste estado, duración, filas procesadas y errores en `etl_metadata`
-- ✅ **Tarifas eléctricas españolas** — clasificación automática P1/P2/P3/P6 con festivos nacionales y franjas horarias oficiales
+- ✅ **Decisiones energéticas accionables** — cada ejecución produce un horizonte de 5 días con generación PV, consumo industrial y precio PVPC por hora y por instalación
+- ✅ **Motor físico de alta fidelidad** — cadena completa atmósfera→electricidad: Haurwitz + Kasten-Czeplak + Erbs + Liu-Jordan + Faiman; determinista y reproducible
+- ✅ **Tarifas eléctricas españolas integradas** — clasificación automática P1/P2/P3/P6 con festivos nacionales oficiales y franjas horarias 2.0TD
+- ✅ **Arquitectura Medallion con linaje completo** — Bronze (raw inmutable) → Silver (validado) → Gold (dimensional); cada dato es trazable hasta su fuente
+- ✅ **Idempotente por diseño** — reejecutar no duplica registros; upsert con clave compuesta en Silver y Gold
+- ✅ **Resiliencia ante fallos parciales** — REE sin publicar precios devuelve `PARTIAL SUCCESS`, no aborta; los manifests actúan como cola de reintentos automática
+- ✅ **Multi-cliente escalable** — añadir una instalación al Excel de origen es suficiente; el pipeline la procesa sin cambios de código
 
 ---
 
@@ -103,79 +111,87 @@ Diseñado para escalar de 1 a N instalaciones sin cambios en el código: añadir
 ```
 sunsaver/
 ├── src/
-│   ├── bronze_ingest_clients.py      # Extracción Excel → JSON Bronze (clientes)
-│   ├── bronze_ingest_prices_ree.py   # Extracción API REE → JSON Bronze (PVPC)
-│   ├── bronze_ingest_weather_owm.py  # Extracción OWM → JSON Bronze (meteorología)
-│   ├── silver_transform_clients.py   # Validación y carga Silver de clientes
-│   ├── silver_transform_prices.py    # Validación y carga Silver de precios
-│   ├── silver_transform_weather.py   # Validación, resampleo y carga Silver de clima
-│   ├── silver_calc_pv_generation.py  # Simulación física PV → clean_calculations
-│   ├── gold_dim_clients.py           # Dimensión cliente (flags has_solar, has_battery)
-│   ├── gold_dim_datetime.py          # Dimensión tiempo (calendario + tarifas P1–P6)
-│   ├── gold_dim_weather.py           # Dimensión condición meteorológica (tipo 2)
-│   ├── gold_fact_energy_forecast.py  # Fact table: generación · consumo · precio
-│   ├── engine_pv_physics.py          # Librería física PV reutilizable (pvlib)
-│   ├── config_paths.py               # Rutas absolutas resolubles con override .env
-│   ├── logger_config.py              # Logger centralizado con rotación diaria
-│   ├── audit_metadata.py             # Persistencia de métricas de ejecución
-│   └── pipeline_runner.py            # Orquestador CLI con --stage y --dry-run
+│   ├── bronze_ingest_clients.py       # Extracción Excel → JSON Bronze (clientes)
+│   ├── bronze_ingest_prices_ree.py    # Extracción API REE → JSON Bronze (PVPC)
+│   ├── bronze_ingest_weather_owm.py   # Extracción OWM → JSON Bronze (meteorología)
+│   ├── silver_transform_clients.py    # Validación y carga Silver de clientes
+│   ├── silver_transform_prices.py     # Validación y carga Silver de precios
+│   ├── silver_transform_weather.py    # Resampleo horario y carga Silver de clima
+│   ├── silver_calc_pv_generation.py   # Simulación física PV → clean_calculations
+│   ├── gold_dim_clients.py            # Dimensión cliente (has_solar, has_battery)
+│   ├── gold_dim_datetime.py           # Dimensión tiempo + tarifas P1–P6
+│   ├── gold_dim_weather.py            # Dimensión condición meteorológica (SCD-2)
+│   ├── gold_fact_energy_forecast.py   # Fact table: generación · consumo · precio
+│   ├── engine_pv_physics.py           # Librería física PV reutilizable (pvlib)
+│   ├── config_paths.py                # Rutas absolutas con override .env
+│   ├── logger_config.py               # Logger centralizado con rotación diaria
+│   ├── audit_metadata.py              # Persistencia de métricas de ejecución
+│   └── pipeline_runner.py             # Orquestador CLI con --stage y --dry-run
+├── docs/                              # Documentación técnica y de negocio (8 docs)
+│   ├── 01_ARCHITECTURE_DECISION_RECORD.md
+│   ├── 02_DATA_CATALOG.md
+│   ├── 03_PIPELINE_TECHNICAL_SPEC.md
+│   ├── 04_DATA_QUALITY_FRAMEWORK.md
+│   ├── 05_STAR_SCHEMA_DESIGN.md
+│   ├── 06_API_INTEGRATION_SPECS.md
+│   ├── 07_OPERATIONS_RUNBOOK.md
+│   └── 08_BUSINESS_INTELLIGENCE_GUIDE.md
 ├── data/
-│   ├── bronze/                       # JSONs raw inmutables (chmod 444)
-│   ├── clients_source.xlsx           # Master de instalaciones (fuente de verdad)
-│   └── sunsaver.db                   # Base de datos SQLite (todas las capas)
-├── logs/                             # Logs diarios: sunsaver_YYYY-MM-DD.log
-├── .env.example                      # Plantilla de variables de entorno
-├── requirements.txt
-└── README.md
+│   ├── bronze/                        # JSONs raw inmutables (chmod 444)
+│   ├── clients_source.xlsx            # Master de instalaciones
+│   └── sunsaver.db                    # Base de datos SQLite (todas las capas)
+├── logs/                              # Logs diarios: sunsaver_YYYY-MM-DD.log
+├── .env.example
+└── requirements.txt
 ```
 
 ---
 
 ## 06 · Instalación y configuración
 
-**Prerequisitos:** Python 3.11+, pip, acceso a las APIs de REE y OpenWeatherMap.
+**Prerequisitos:** Python 3.11+, acceso a las APIs de REE y OpenWeatherMap.
 
 ```bash
 # 1. Clonar el repositorio
-git clone https://github.com/tu-usuario/sunsaver.git
-cd sunsaver
+git clone https://github.com/aitor-industrial-data/Data-Projects-Repo.git
+cd Data-Projects-Repo/05_ETL_Pipelines/05.02_SunSaver_ETL
 
 # 2. Crear entorno virtual e instalar dependencias
-python -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
+python -m venv venv
+source venv/bin/activate        # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
 # 3. Configurar variables de entorno
 cp .env.example .env
-# Editar .env con las claves de API y rutas opcionales
+# Editar .env: WEATHER_API_KEY es la única variable obligatoria
 ```
 
-Las variables de entorno necesarias están documentadas en `.env.example`. Las dos imprescindibles son `WEATHER_API_KEY` (OpenWeatherMap) y opcionalmente `DB_PATH` si se quiere un SQLite fuera del directorio por defecto.
+Las variables disponibles están documentadas en `.env.example`. `DB_PATH` y `BRONZE_PATH` son opcionales y permiten redirigir el almacenamiento fuera del directorio por defecto.
 
 ---
 
 ## 07 · Uso rápido
 
 ```bash
-# Pipeline completo (recomendado para producción)
+# Pipeline completo
 python src/pipeline_runner.py
 
-# Dry-run: ver el plan de ejecución sin tocar datos
+# Ver el plan sin ejecutar nada
 python src/pipeline_runner.py --dry-run
 
-# Reanudar desde un stage concreto (ej: recalcular desde PV en adelante)
+# Reanudar desde un stage concreto (ej: recalcular PV y Gold sin reingestar)
 python src/pipeline_runner.py --stage 5
 ```
 
-**Salida esperada (fragmento):**
+**Salida esperada:**
 
 ```
-2026-05-13 08:00:01 | INFO     | pipeline_runner               | ── STAGE 1 ────────────────────────────
-2026-05-13 08:00:02 | INFO     | pipeline_runner               |   ✔  extract_clients completado (1.2s) | Filas: 12
-2026-05-13 08:00:03 | INFO     | pipeline_runner               |   ✔  extract_energy_prices completado (0.8s) | Filas: 24
+2026-05-13 08:00:01 | INFO | pipeline_runner | ── STAGE 1 ──────────────────────
+2026-05-13 08:00:02 | INFO | pipeline_runner |   ✔  extract_clients (1.2s) | Filas: 12
+2026-05-13 08:00:03 | INFO | pipeline_runner |   ✔  extract_energy_prices (0.8s) | Filas: 24
 ...
-2026-05-13 08:01:47 | INFO     | pipeline_runner               | PIPELINE FINALIZADO en 106.43s
-2026-05-13 08:01:47 | INFO     | pipeline_runner               | Total Filas: 3.847  |  Steps OK: 11  |  Steps KO: 0
+2026-05-13 08:01:47 | INFO | pipeline_runner | PIPELINE FINALIZADO en 106.43s
+2026-05-13 08:01:47 | INFO | pipeline_runner | Total Filas: 3.847 | Steps OK: 11 | Steps KO: 0
 ```
 
 ---
@@ -184,7 +200,7 @@ python src/pipeline_runner.py --stage 5
 
 | Parámetro | Defecto | Descripción |
 |---|---|---|
-| `--stage N` | `1` | Stage desde el que arrancar el pipeline (1–6) |
+| `--stage N` | `1` | Stage desde el que arrancar (1–6) |
 | `--dry-run` | `false` | Muestra el plan sin ejecutar ninguna función |
 | `DB_PATH` | `data/sunsaver.db` | Ruta absoluta a la base de datos SQLite |
 | `BRONZE_PATH` | `data/bronze/` | Directorio de almacenamiento de archivos Bronze |
@@ -192,58 +208,85 @@ python src/pipeline_runner.py --stage 5
 
 **Modos de ejecución:**
 
-- **Completo** — `pipeline_runner.py` sin argumentos. Reprocesa todo desde Stage 1.
-- **Incremental** — `--stage 5` o superior. Útil cuando solo cambian los datos de generación.
-- **Dry-run** — validación de configuración y dependencias sin efectos secundarios.
+- **Completo** — sin argumentos; reprocesa todo desde Stage 1 incluyendo ingesta de APIs.
+- **Incremental** — `--stage 5` o superior; recalcula PV y Gold sin tocar las capas de ingesta.
+- **Dry-run** — verifica configuración y dependencias sin efectos secundarios ni llamadas a APIs.
 
-Los manifests de Bronze (`_process_manifest_*.json`) actúan como cola de trabajo: las tareas con estado `pending` o `error` se reintentarán automáticamente en la siguiente ejecución.
+Los manifests Bronze (`_process_manifest_*.json`) actúan como cola de trabajo: las tareas con estado `pending` o `error` se reintentarán automáticamente en la siguiente ejecución. Para playbooks operativos completos, ver [`docs/07_OPERATIONS_RUNBOOK.md`](docs/07_OPERATIONS_RUNBOOK.md).
 
 ---
 
 ## 09 · Testing y calidad de datos
 
 ```bash
-# Ejecutar tests unitarios
+# Tests unitarios
 pytest tests/ -v --tb=short
 
-# Test standalone del motor físico PV (sin base de datos)
+# Test standalone del motor físico PV (sin base de datos ni APIs)
 python src/engine_pv_physics.py
 ```
 
-Las validaciones de calidad están integradas en cada capa Silver:
+La calidad del dato está embebida en cada capa, no es un proceso posterior. Un precio incorrecto puede llevar a cargar baterías en hora punta; unas coordenadas erróneas generan previsiones meteorológicas de otra ubicación e invalidan todos los cálculos PV. El framework aplica el principio **"fail fast, fail loudly"**:
 
-- **Tipos** — coerción con `pd.to_numeric` y `pd.to_datetime`; valores no parseables pasan a `NaN` antes de ser descartados o imputados.
-- **Rangos geográficos** — latitud `[-90, 90]`, longitud `[-180, 180]`; registros fuera de rango se eliminan.
-- **Reglas de negocio** — ángulo `[0°–90°]`, pérdidas `[0%–90%]`, eficiencia `[0–1]`; fuera de rango se imputan con valores de referencia de la industria.
+- **Tipos y rangos** — coerción con pandas; fuera de rango imputa valores de referencia documentados (ángulo → 30°, pérdidas → 14%, eficiencia → 0.15).
+- **Reglas geográficas** — latitud `[-90, 90]` y longitud `[-180, 180]`; registros fuera de rango eliminados antes de cualquier cálculo PV.
 - **Precios** — outliers fuera de `[-100, 2 000] EUR/MWh` filtrados; huecos interpolados linealmente por tipo de precio.
+- **Deduplicación** — por `(client_id, unix_time)` como PK compuesta en Silver y Gold; idempotencia garantizada en toda la cadena.
+
+Para el catálogo completo de reglas de validación, quality scores y proceso de remediación, ver [`docs/04_DATA_QUALITY_FRAMEWORK.md`](docs/04_DATA_QUALITY_FRAMEWORK.md).
 
 ---
 
 ## 10 · Observabilidad y errores
 
-Los logs se escriben simultáneamente en consola y en `logs/sunsaver_YYYY-MM-DD.log` con rotación diaria automática. El formato es `TIMESTAMP | LEVEL | MODULE | MESSAGE`, lo que facilita el filtrado con `grep` o cualquier agregador de logs.
+Los logs se escriben simultáneamente en consola y en `logs/sunsaver_YYYY-MM-DD.log` con rotación diaria. Formato: `TIMESTAMP | LEVEL | MODULE | MESSAGE` — filtrable con `grep` o cualquier agregador de logs.
 
-Ante un fallo en una tarea individual, el orquestador **no aborta**: marca la tarea como `error` en el manifest y continúa. Si un stage completo falla (todos los pasos del stage devuelven `False`), el pipeline se detiene con `FAILED AT STAGE N`. En cualquier caso, la ejecución se registra en `etl_metadata` con estado `PARTIAL SUCCESS` o `FAILED`, duración y resumen del error.
+Ante un fallo individual el orquestador **no aborta**: registra la tarea como `error` en el manifest y continúa. Si un stage completo falla, el pipeline se detiene con `FAILED AT STAGE N`. Cada ejecución persiste en `etl_metadata` con estado, duración, filas procesadas y resumen del error.
 
-Los archivos Bronze (chmod 444) son **inmutables** una vez escritos: garantía de que el dato raw original nunca se modifica, solo se vuelve a procesar desde Silver hacia arriba.
+Los archivos Bronze son **inmutables** (chmod 444): el dato raw original nunca se modifica; cualquier reingesta crea un nuevo archivo y el manifest gestiona cuál procesar.
+
+```bash
+# Ver las últimas ejecuciones del pipeline
+sqlite3 data/sunsaver.db "SELECT * FROM etl_metadata ORDER BY id DESC LIMIT 5;"
+
+# Logs en tiempo real
+tail -f logs/sunsaver_$(date +%Y-%m-%d).log
+```
+
+Para playbooks de incidencias y SLAs, ver [`docs/07_OPERATIONS_RUNBOOK.md`](docs/07_OPERATIONS_RUNBOOK.md).
 
 ---
 
 ## 11 · Decisiones de diseño
 
-**Arquitectura Medallion sobre un data warehouse convencional** — La separación Bronze/Silver/Gold permite reejecutar cualquier transformación sin perder el dato original. Con un DWH clásico habríamos necesitado tablas de staging adicionales y lógica de rollback.
+**Motor físico propio (pvlib) sobre APIs de predicción solar de terceros** — El cálculo determinista garantiza reproducibilidad completa: dado el mismo input meteorológico, el output es siempre idéntico. Una API externa añade latencia, coste y opacidad. El motor es testeable unitariamente y auditable línea a línea. → [`docs/01_ARCHITECTURE_DECISION_RECORD.md`](docs/01_ARCHITECTURE_DECISION_RECORD.md)
 
-**SQLite sobre PostgreSQL para la capa analítica** — El volumen actual (decenas de clientes, horizonte de 5 días) no justifica la complejidad operacional de un servidor. SQLite permite entregar el proyecto completo como un único fichero portable; la migración a PostgreSQL es trivial porque SQLAlchemy abstrae el dialecto.
+**Manifests JSON como cola de trabajo en Bronze** — Evita una dependencia de infraestructura (Redis, Celery, Airflow) manteniendo la capacidad de reintentar tareas fallidas individualmente. Comprensible sin herramientas externas; inspeccionable con un editor de texto o `cat`.
 
-**Motor físico propio (pvlib) sobre APIs de terceros de predicción solar** — El cálculo determinista garantiza reproducibilidad completa: dado el mismo input meteorológico, el output es idéntico. Una API externa añadiría latencia, coste y una caja negra en el modelo.
+**SQLite sobre PostgreSQL en la capa analítica** — El volumen actual no justifica la complejidad operacional de un servidor. SQLite entrega el proyecto como un único fichero portable; la migración es transparente porque SQLAlchemy abstrae el dialecto.
 
-**Manifests JSON como cola de trabajo en Bronze** — Evita una dependencia de infraestructura (Redis, Celery, Airflow) manteniendo la capacidad de reintentar tareas fallidas individualmente. La solución es suficientemente robusta para el volumen actual y trivial de entender.
+**Star Schema Kimball con granularidad declarada** — Exactamente una fila por `(instalación, hora UTC)`. Medidas de potencia (kW) y coste (€) son aditivas a lo largo de todas las dimensiones; el Performance Ratio es no-aditivo y se documenta explícitamente. → [`docs/05_STAR_SCHEMA_DESIGN.md`](docs/05_STAR_SCHEMA_DESIGN.md)
 
 **Roadmap:**
-- Scheduler con APScheduler o cron para ejecución autónoma diaria
-- Exportación de resultados a Parquet para integración con herramientas BI (Power BI, Metabase)
-- Soporte multi-zona horaria para instalaciones fuera de España peninsular
-- Contenerización con Docker para despliegue reproducible
+- Scheduler con APScheduler para ejecución autónoma diaria (publicación REE: 20:30 CET)
+- Exportación a Parquet para integración con herramientas BI (Power BI, Metabase)
+- Contenerización con Docker para despliegue reproducible en cualquier entorno
+- API REST sobre la capa Gold para consumo por dashboards o aplicaciones externas
+
+---
+
+## 📚 Documentación completa
+
+| # | Documento | Contenido |
+|---|---|---|
+| 01 | [`ARCHITECTURE_DECISION_RECORD`](docs/01_ARCHITECTURE_DECISION_RECORD.md) | Cada decisión arquitectónica: qué se eligió, qué se descartó y por qué |
+| 02 | [`DATA_CATALOG`](docs/02_DATA_CATALOG.md) | Inventario completo de tablas, campos, tipos y linaje campo a campo |
+| 03 | [`PIPELINE_TECHNICAL_SPEC`](docs/03_PIPELINE_TECHNICAL_SPEC.md) | DAG de ejecución, dependencias entre stages, estrategias de idempotencia |
+| 04 | [`DATA_QUALITY_FRAMEWORK`](docs/04_DATA_QUALITY_FRAMEWORK.md) | Catálogo de reglas de validación, quality scores y proceso de remediación |
+| 05 | [`STAR_SCHEMA_DESIGN`](docs/05_STAR_SCHEMA_DESIGN.md) | Modelo dimensional Kimball, guía de aditividad y queries de referencia |
+| 06 | [`API_INTEGRATION_SPECS`](docs/06_API_INTEGRATION_SPECS.md) | Contratos de API, patrones de resiliencia y gestión de credenciales |
+| 07 | [`OPERATIONS_RUNBOOK`](docs/07_OPERATIONS_RUNBOOK.md) | Playbooks de incidencias, SLAs, procedimientos de backfill y rollback |
+| 08 | [`BUSINESS_INTELLIGENCE_GUIDE`](docs/08_BUSINESS_INTELLIGENCE_GUIDE.md) | KPIs de negocio, casos de uso de toma de decisiones y guía de consumo BI |
 
 ---
 
