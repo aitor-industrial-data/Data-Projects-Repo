@@ -1,6 +1,3 @@
-e · MD
-Copiar
-
 # ⚡ Industrial Energy Analytics — Big Data Spark Capstone
  
 > **Transformando 2 millones de registros de telemetría eléctrica en decisiones financieras concretas mediante Apache Spark.**
