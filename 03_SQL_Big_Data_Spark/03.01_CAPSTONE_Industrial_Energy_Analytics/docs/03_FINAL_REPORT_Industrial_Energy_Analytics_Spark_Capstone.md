@@ -281,7 +281,7 @@ La hipótesis se valida con un resultado de 37.66%, duplicando con creces el umb
 
 * **Conclusión e Impacto en el Negocio:**
 
-    * **Evidencia Pericial:** Los datos de Spark proporcionan una base técnica sólida para reclamaciones a la distribuidora, demostrando que aunque se cumple la legalidad (>207V), existe una degradación silenciosa de los activos.
+    * **Evidencia Preliminar:** Los datos de Spark revelan un patrón estadísticamente consistente de exposición a la Zona de Estrés (<228V) en franjas de baja carga interna. Esta evidencia, generada sobre promedios minutales, es suficiente para justificar una solicitud formal de auditoría con instrumental de Clase A a la distribuidora, pero no para una reclamación legal directa sin medición certificada previa.
     * **Protección de Activos:** Se justifica la inversión en SAIs de Doble Conversión para electrónica crítica y una reprogramación horaria para evitar sumar carga interna entre las 09:00 y las 12:00.
     * **Optimización de Capex:** Se evita una inversión innecesaria en el re-cableado de la vivienda, ya que el análisis de datos demuestra que la infraestructura interna es sobresaliente.
 
@@ -336,7 +336,7 @@ Basado en la evidencia de los datos, el plan de acción post-notebook es:
 
 **Medio Plazo (Eficiencia Estructural y Reclamación):**
 * **Eliminación de "Cargas Fantasma":** Implementar Smart Kill-Switches para erradicar el suelo de standby de 0.20 kW, bajando el ratio del 37% al <10%.
-* **Acción Legal Basada en estudio de datos (H4):** Generación de un informe técnico pericial fundamentado en el procesamiento de 2.075.259 registros mediante Big Data Spark. La evidencia central es la exposición recurrente a la "Zona de Estrés" (<228V), detectada especialmente en franjas de baja carga interna. Se alega que, aunque los promedios minutales son legales, suponen la "punta del iceberg" de fluctuaciones instantáneas mucho más graves (sospecha de caídas a <215V) que la granularidad actual oculta. Este informe técnico servirá para exigir a la distribuidora una auditoría con instrumental de Clase A y el reajuste del transformador, basándose en la degradación por fatiga térmica acumulada en los equipos de la vivienda.
+* **Acción Técnica ante la Distribuidora (H4):** Con el procesamiento de 2.075.259 registros como respaldo documental, se propone presentar un requerimiento técnico formal exigiendo una auditoría de calidad de suministro con instrumental de Clase A. La evidencia central —exposición recurrente a la Zona de Estrés especialmente en franjas de baja carga interna— fundamenta la solicitud de revisión del transformador de zona. Si la auditoría certificada confirma caídas instantáneas por debajo de los límites del RD 1955/2000, se abre entonces la vía de reclamación por daños a activos.
 
 ### 6.5 Roadmap de Escalabilidad del Proyecto
 Para escalar este proyecto al siguiente nivel de Data Engineering, se proponen las siguientes fases:
