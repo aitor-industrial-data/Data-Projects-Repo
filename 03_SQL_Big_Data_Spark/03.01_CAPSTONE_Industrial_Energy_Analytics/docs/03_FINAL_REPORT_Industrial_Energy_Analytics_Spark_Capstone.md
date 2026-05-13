@@ -187,7 +187,7 @@ Este proyecto ha sido desarrollado bajo el principio de escalabilidad horizontal
 * **Resultado: ✅ VALIDADA**
 El análisis masivo confirma que la instalación está sobredimensionada. Los picos de demanda máxima no son estructurales, sino operativos:
     * **Identificación del "Trigger":** El circuito de Lavandería (S2) es el responsable de la saturación, aportando picos de ~4.0 kW que, al sumarse a la demanda base, disparan el consumo.
-    * **Exoneración de Sistemas:** La climatización (S3) se mantiene estable (~1.0 kW), descartándose como causa raíz de los picos de arranque.
+    * **Exoneración Cuantitativa de S3 (H1.2):** El desglose de carga en los 1.847 eventos críticos >8 kW confirma que la climatización (S3) aporta únicamente el ~10% del total (~900-1000 W) durante los picos. Este valor es constante e independiente de la hora del día, descartando con evidencia estadística que S3 sea el trigger de la sobrepotencia. El factor desencadenante es exclusivamente la simultaneidad de S2 (Lavandería, ~40%) con la carga base general (~30-35%).
     * **Ventana Crítica:** Los eventos se concentran entre las 18:00 y 22:00, coincidiendo con el uso inamovible de la Cocina (S1).
 
 * **Visual Evidence:** <br>

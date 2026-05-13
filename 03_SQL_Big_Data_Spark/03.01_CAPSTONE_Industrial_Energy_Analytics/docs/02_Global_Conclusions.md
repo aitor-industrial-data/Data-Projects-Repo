@@ -20,7 +20,9 @@ A continuación, se tabula el impacto de cada vector de análisis sobre la opera
 ## 2. Conclusiones Transversales de Ingeniería
 
 ### 2.1 Arquitectura de Carga y Eficiencia Operativa
-El análisis revela una instalación con una excelente salud de infraestructura interna (**H4**), pero con una gestión operativa deficiente (**H1, H2, H3**). La vivienda sufre de un "goteo" energético constante que representa más de un tercio de su consumo total. 
+El análisis revela una instalación con una excelente salud de infraestructura interna (**H4**), pero con una gestión operativa deficiente (**H1, H2, H3**). La vivienda sufre de un "goteo" energético constante que representa más de un tercio de su consumo total.
+
+Nota técnica H1: La hipótesis de simultaneidad queda blindada por el análisis forense de H1.2, que exonera cuantitativamente a la climatización (S3) como causa raíz. Con solo ~10% de participación en los picos críticos frente al ~40% de lavandería, el escalonamiento de S2 es la única intervención necesaria para eliminar el 100% de los eventos de sobredemanda.
 
 > **Hallazgo Clave (H3):** El consumo residual de 0.472 kW en circuitos generales. Mediante analítica NILM, se ha desglosado este valor en un standby ~0.35 kW y una carga cíclica de refrigeración secundaria (presumiblemente un arcón o minibar fuera de la cocina) con un Duty Cycle del 19.78%. Aunque este ciclo de trabajo indica una salud mecánica óptima (inferior al umbral crítico del 25%), la elevada potencia de pico (0.44 kW) revela un equipo tecnológicamente obsoleto. Se descarta el mantenimiento preventivo en favor de una sustitución estratégica por tecnología Inverter, lo que reduciría el standby total a 0.35 kW y generaría un ahorro de 1,068 kWh/año, garantizando un ROI de 1.9 años."
 

@@ -37,7 +37,7 @@ Las herramientas convencionales (Excel, bases de datos relacionales) colapsan an
  
 **Pregunta:** ¿Los picos de demanda (>8 kW) son estructuralmente necesarios o simplemente una mala gestión de cargas?
  
-**Hallazgo:** La instalación está **sobredimensionada por hábito operativo**. El circuito de lavandería (Sub_metering_2) genera picos de ~4 kW que, sumados a la demanda de cocina, superan el umbral contratado — pero solo el **0,005% del año**.
+**Hallazgo:** La instalación está **sobredimensionada por hábito operativo**. El circuito de lavandería (Sub_metering_2) genera picos de ~4 kW que, sumados a la demanda de cocina, superan el umbral contratado — pero solo el **0,005% del año**. El análisis forense de la composición de carga (H1.2) exonera a la climatización: S3 aporta un ~10% constante en todos los picos. El trigger es la lavandería (S2, ~40%) coincidiendo con la carga base.
  
 **Impacto en negocio:** Reducir la potencia contratada de 10 kW → **6,9 kW** genera ahorro inmediato y recurrente en el término fijo de la factura. Sin inversión de capital (**CapEx 0**).
  
@@ -101,19 +101,25 @@ Las herramientas convencionales (Excel, bases de datos relacionales) colapsan an
 <img src="./docs/H4_root_cause_analysis.png" alt="H4 Root Cause Analysis" width="800">
 > **Cómo leer el gráfico:** El 72,5% de los minutos de estrés se clasifican como "External/Grid Weakness". Solo el 2,2% corresponde a estrés por picos críticos internos. La red interna no es el problema.
 </details>
+
 ---
+
+## 💰 Impacto económico real
  
-## 💰 Resumen financiero
+> Cálculos aplicados al mercado eléctrico español (tarifa PVPC 2025): **~60 €/kW·año** en término de potencia · **0,137 €/kWh** de energía (fuente: Red Eléctrica de España / CNMC). El dataset procede de una vivienda en Francia; los hallazgos se presentan extrapolados al contexto tarifario español, mercado de aplicación profesional de este análisis.
  
-| Acción | Inversión | Ahorro anual | ROI |
-|---|---|---|---|
-| Reducir potencia contratada a 6,9 kW | **€0 (CapEx 0)** | Reducción inmediata en término fijo | **Inmediato** |
-| Sustituir frigorífico secundario (Inverter) | CapEx medio | 1.068 kWh/año | **1,9 años** |
-| Instalar Smart Kill-Switches | CapEx bajo | ~700 kWh/año | < 2 años |
-| **Ahorro total proyectado** | | **~2.800 kWh/año** | |
+| # | Acción | Inversión estimada | Ahorro energético | Ahorro en € / año | ROI |
+|---|---|---|---|---|---|
+| H1 | ↓ Potencia contratada: 10 kW → 6,9 kW | **€0** *(gestión tarifaria)* | — | **~186 €** *(3,1 kW × 60 €/kW)* | **Inmediato** |
+| H3a | Sustituir arcón/vinoteca por tecnología Inverter | **~300 €** *(gama media, MediaMarkt/El Corte Inglés)* | 1.068 kWh/año | **~146 €** *(× 0,137 €/kWh)* | **~2 años** |
+| H3b | Instalar Smart Kill-Switches (4× Tapo P110, ~15 €/ud) | **~60 €** *(enchufes inteligentes con monitoreo)* | ~700 kWh/año | **~96 €** | **< 1 año** |
+| | | | | | |
+| | **TOTAL** | **~360 €** | **~1.768 kWh/año** | **🟢 ~428 €/año** | **< 1 año** *(global)* |
+ 
+> 💡 **La lectura clave:** con una inversión única de ~360 €, el sistema se amortiza en menos de 12 meses y genera ~428 €/año de ahorro recurrente de forma indefinida. La acción de mayor retorno es el ajuste de potencia: **186 €anuales sin gastar un euro**, simplemente reorganizando el uso de la lavandería.
  
 ---
- 
+
 ## 🛠️ Stack tecnológico
  
 ```
@@ -138,7 +144,7 @@ Python                            — Lógica ETL e ingeniería de característi
 │   ├── 02_Global_Conclusions.md             # Impacto en negocio y análisis financiero
 │   ├── 03_FINAL_REPORT_[...].md             # Informe técnico pericial completo
 │   └── [H1–H4]_*.png                        # Evidencia visual por hipótesis
-├── data_storage/work/                        # Dataset procesado en formato Parquet
+├── data_storage/work/                       # Dataset procesado en formato Parquet
 └── README.md
 ```
  
@@ -163,9 +169,7 @@ cd ~/Documents/Data-Projects-Repo/03_SQL_Big_Data_Spark/03.01_CAPSTONE_Industria
  
 ## 👤 Sobre el autor
  
-**Aitor** — Ingeniero Técnico Industrial Eléctrico con 10 años de experiencia en infraestructura eléctrica industrial, en transición a Data Engineering.
- 
-Este proyecto une ambos mundos: la metodología técnica rigurosa de la ingeniería eléctrica aplicada a la escala y las herramientas del dato moderno. El objetivo no es solo procesar datos — es extraer decisiones de ellos.
+Aitor — Ingeniero Técnico Industrial Eléctrico con 10 años en automatización industrial, diseño eléctrico y sistemas de control. Aplico ese dominio técnico a proyectos de Data Engineering donde el contexto de negocio marca la diferencia entre un análisis correcto y uno útil.
  
 ---
  
