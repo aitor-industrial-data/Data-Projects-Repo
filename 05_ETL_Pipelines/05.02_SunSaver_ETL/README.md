@@ -1,238 +1,252 @@
-# ☀️ SunSaver ETL — Plataforma de Inteligencia Fotovoltaica
-
-> **Transformando datos brutos de generación solar y meteorología en decisiones energéticas respaldadas por datos para instalaciones industriales.**
-
----
-
-## 🏭 El Problema Industrial
-
-Las instalaciones industriales con sistemas fotovoltaicos se enfrentan cada día a un problema crítico y costoso: **operan a ciegas**.
-
-Los paneles están generando energía. La red la está tarifando de forma diferente cada hora. El cielo está cambiando. Pero el responsable de operaciones no dispone de una visión unificada y en tiempo real que conecte todo esto.
-
-El resultado:
-
-- Compresores y hornos funcionan en hora punta cuando la electricidad de red cuesta 3× más
-- Las baterías permanecen inactivas mientras el excedente solar se vierte a la red a precios casi nulos
-- El mantenimiento es reactivo, nunca predictivo
-- El departamento financiero es incapaz de verificar si la instalación solar está entregando el ROI prometido
-
-**SunSaver ETL resuelve esto.** Es un pipeline de datos de calidad productiva que ingesta, transforma y estructura cada variable que determina el coste energético y el rendimiento solar — proporcionando a los operadores industriales la base analítica que necesitan para actuar, no solo para observar.
-
----
-
-## 🔬 Qué Hace
-
-SunSaver es un **pipeline ETL multi-etapa** construido sobre la arquitectura medallón (Bronce → Plata → Oro). Cada 24 horas:
-
-1. **Lee la configuración de las instalaciones** desde un fichero Excel maestro (especificaciones de paneles, coordenadas GPS, coeficientes de pérdidas, configuración de batería)
-2. **Descarga los precios de electricidad del día siguiente** desde la API pública de REE (PVPC + Mercado Spot, hora a hora)
-3. **Obtiene previsiones meteorológicas a 5 días** desde OpenWeatherMap para las coordenadas exactas de cada cliente
-4. **Ejecuta un modelo físico de generación FV** que calcula, para cada ventana de pronóstico de 3 horas:
-   - Irradiancia Global Horizontal (GHI) con el modelo de cielo despejado de Haurwitz + corrección por nubosidad y código meteorológico
-   - Descomposición beam/difusa mediante el **modelo de Erbs**
-   - Irradiancia en el Plano del Array (POA) considerando inclinación del panel, azimut y albedo del suelo
-   - Temperatura de célula con el **modelo de Faiman**
-   - Potencia AC de salida con derating térmico y coeficientes de pérdidas del sistema
-   - Simulación dinámica del consumo industrial (turnos, carga HVAC, ruido estocástico)
-5. **Puebla la capa Gold** con un star schema listo para dashboards BI o modelos ML
-
-Todo esto se ejecuta de forma desatendida, idempotente y con logging estructurado en cada paso.
-
----
-
-## 🏗️ Arquitectura
+<div align="center">
 
 ```
-┌────────────────────────────────────────────────────────────────┐
-│                      FUENTES DE DATOS                          │
-│  Excel (clientes)  │  API REE (precios)  │  API OpenWeather    │
-└────────┬───────────┴────────┬────────────┴────────┬────────────┘
-         │                    │                     │
-         ▼                    ▼                     ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    🥉 CAPA BRONCE                               │
-│   raw_clients  │  raw_prices  │  raw_weather                    │
-│   (append-only, trazabilidad completa, _ingested_at_utc)        │
-└────────────────────────────┬────────────────────────────────────┘
-                             │
-                             ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    🥈 CAPA PLATA                                │
-│  clean_clients │ clean_prices │ clean_weather │ clean_calcs     │
-│  (tipado, validado, deduplicado, PK forzada)                    │
-│                        │                                        │
-│          ┌─────────────┘                                        │
-│          ▼                                                      │
-│   ⚡ MOTOR DE GENERACIÓN FV (pvlib + Haurwitz + Erbs + Faiman)   │
-└────────────────────────────┬────────────────────────────────────┘
-                             │
-                             ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    🥇 CAPA ORO (Star Schema)                    │
-│  gold_dim_client  │  gold_dim_datetime  │  gold_dim_weather     │
-│                   gold_fact_energy_forecast                     │
-│  (listo para BI, FK forzadas, indexado)                         │
-└─────────────────────────────────────────────────────────────────┘
+███████╗██╗   ██╗███╗   ██╗███████╗ █████╗ ██╗   ██╗███████╗██████╗
+██╔════╝██║   ██║████╗  ██║██╔════╝██╔══██╗██║   ██║██╔════╝██╔══██╗
+███████╗██║   ██║██╔██╗ ██║███████╗███████║██║   ██║█████╗  ██████╔╝
+╚════██║██║   ██║██║╚██╗██║╚════██║██╔══██║╚██╗ ██╔╝██╔══╝  ██╔══██╗
+███████║╚██████╔╝██║ ╚████║███████║██║  ██║ ╚████╔╝ ███████╗██║  ██║
+╚══════╝ ╚═════╝ ╚═╝  ╚═══╝╚══════╝╚═╝  ╚═╝  ╚═══╝  ╚══════╝╚═╝  ╚═╝
 ```
 
-### Orden de Ejecución del Pipeline
+![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=flat-square&logo=python&logoColor=white)
+![SQLite](https://img.shields.io/badge/SQLite-3-003B57?style=flat-square&logo=sqlite&logoColor=white)
+![pvlib](https://img.shields.io/badge/pvlib-0.11-F7931E?style=flat-square)
+![Pipeline](https://img.shields.io/badge/Pipeline-6%20stages-22C55E?style=flat-square)
+![Architecture](https://img.shields.io/badge/Architecture-Medallion-8B5CF6?style=flat-square)
+![License](https://img.shields.io/badge/License-MIT-6B7280?style=flat-square)
 
-| Stage | Paso | Entrada → Salida |
-|-------|------|-----------------|
-| 1 | `extract_clients` | Excel → `raw_clients` |
-| 1 | `extract_energy_prices` | API REE → `raw_prices` |
-| 2 | `transform_clients` | `raw_clients` → `clean_clients` |
-| 2 | `transform_energy_prices` | `raw_prices` → `clean_prices` |
-| 3 | `extract_openweather` | API OpenWeather → `raw_weather` |
-| 4 | `transform_openweather` | `raw_weather` → `clean_weather` |
-| 5 | `extract_generation_data` | `clean_clients` + `clean_weather` → `clean_calculations` |
-| 6 | `gold_dim_*` + `gold_fact_energy_forecast` | Plata → Oro |
+**Pipeline ETL de predicción energética solar para instalaciones industriales fotovoltaicas.**
+
+</div>
 
 ---
 
-## ⚡ El Motor de Física
+## 01 · Descripción del proyecto
 
-El diferenciador técnico de SunSaver es que no depende de tablas de consulta de irradiancia simplificadas. Implementa una **cadena de modelos fotovoltaicos validados**:
+SunSaver es un pipeline ETL de producción que ingiere datos meteorológicos en tiempo real (OpenWeatherMap), precios horarios del mercado eléctrico español (REE/PVPC) y parámetros de instalación por cliente, para generar **predicciones de generación fotovoltaica y consumo industrial** en un horizonte de 5 días. El resultado alimenta un modelo de datos dimensional (Gold) listo para reporting o toma de decisiones de optimización energética.
 
-```
-Posición Solar (pvlib) → GHI (Haurwitz + Corrección por Nubosidad)
-    → DNI + DHI (Descomposición Erbs)
-        → POA (Liu-Jordan + Albedo)
-            → T_célula (Faiman)
-                → P_AC (Derating Térmico + Pérdidas del Sistema)
-```
-
-Cada paso degrada con seguridad: si el sol está por debajo de 2° de elevación, todos los cálculos posteriores cortocircuitan a cero, eliminando la inestabilidad numérica característica de los cálculos cerca del horizonte.
-
-El modelo de consumo simula un perfil de carga industrial real — picos de arranque de turno, valle del mediodía, respuesta HVAC a la temperatura ambiente — produciendo cifras de balance energético neto que los equipos de operaciones pueden utilizar directamente.
+Diseñado para escalar de 1 a N instalaciones sin cambios en el código: añadir un cliente nuevo al Excel de origen es suficiente.
 
 ---
 
-## 🗄️ Esquema Gold (Star Schema)
+## 02 · Arquitectura del pipeline
 
-```sql
-gold_fact_energy_forecast
-    ├── client_id          (FK → gold_dim_client)
-    ├── unix_time          (FK → gold_dim_datetime)
-    ├── weather_id         (FK → gold_dim_weather)
-    ├── pv_power_gen_kw
-    ├── power_consumption_kw
-    ├── poa_wm2
-    ├── t_cell_celsius
-    ├── temp_celsius / humidity_pct / clouds_pct / wind_speed_mps
-    ├── price_pvpc_eur_mwh
-    └── price_spot_eur_mwh
-
-gold_dim_datetime
-    ├── datetime_utc / datetime_local
-    ├── tariff_period      (P1 Punta / P2 Llano / P3 Valle / P6 Super-Valle)
-    ├── is_weekend / is_festivo / is_daylight
-    └── hour_utc / hour_local / day_of_week / month / year
-
-gold_dim_client
-    ├── pv_peak_power_kw / panel_type / efficiency / loss_pct
-    ├── angle / aspect / mounting
-    ├── battery_capacity_kwh / soc_min_pct
-    ├── has_solar / has_battery   (flags booleanos derivados)
-    └── installation_cost_eur
-
-gold_dim_weather
-    ├── weather_id (códigos OpenWeather)
-    ├── weather_main / weather_description
-    └── (resuelto por frecuencia cuando existen múltiples descripciones para el mismo ID)
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                          FUENTES DE ENTRADA                                  │
+│   📊 clients_source.xlsx    🌤 OpenWeatherMap API    ⚡ REE API (PVPC)        │
+└───────────────┬─────────────────────┬────────────────────────┬───────────────┘
+                │                     │                        │
+                ▼                     ▼                        ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  STAGE 1 · BRONZE  ── Raw ingestion · JSON inmutable (chmod 444)             │
+│  bronze_ingest_clients  ·  bronze_ingest_prices_ree  ·  bronze_ingest_weather│
+│  Process manifests por fuente · trazabilidad completa de archivos            │
+└───────────────────────────────────┬──────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  STAGE 2–4 · SILVER  ── Validación · deduplicación · imputación              │
+│  silver_transform_clients  ·  silver_transform_prices  ·  silver_transform   │
+│  Tipos forzados · reglas de negocio · resampleo horario con interpolación    │
+└───────────────────────────────────┬──────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  STAGE 5 · FÍSICA PV  ── Motor de simulación físico (pvlib)                  │
+│  Posición solar · GHI/DNI/DHI · POA · T_cell Faiman · Potencia AC            │
+│  Modelo de consumo industrial con turnos + carga térmica + variabilidad      │
+└───────────────────────────────────┬──────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  STAGE 6 · GOLD  ── Modelo dimensional para análisis y reporting             │
+│  dim_client · dim_datetime (tarifas P1-P6) · dim_weather · fact_energy       │
+└──────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+                        📁 SQLite  ·  sunsaver.db
+                        📋 etl_metadata  (auditoría de ejecuciones)
 ```
 
 ---
 
-## 🛠️ Stack Tecnológico
+## 03 · Stack tecnológico
 
-| Capa | Tecnología |
-|------|------------|
-| Lenguaje | Python 3.11+ |
-| Modelado FV | `pvlib` (estándar de la industria) |
-| Manipulación de datos | `pandas`, `numpy` |
-| Base de datos | SQLite (portable, sin configuración) |
-| ORM/SQL | `sqlalchemy` (UPSERT, DDL) |
-| APIs externas | `requests` (REE, OpenWeather) |
-| Configuración | `python-dotenv` |
-| Planificación | Cron / cualquier scheduler |
-
----
-
-## 🚀 Inicio Rápido
-
-```bash
-# 1. Clonar e instalar
-git clone https://github.com/aitor-industrial-data/Data-Projects-Repo/tree/main/05_ETL_Pipelines/05.02_SunSaver_ETL.git
-cd sunsaver-etl
-pip install -r requirements.txt
-
-# 2. Configurar el entorno
-cp .env.example .env
-# Editar .env → añadir WEATHER_API_KEY (OpenWeatherMap)
-#             → opcionalmente configurar DB_PATH
-
-# 3. Añadir las instalaciones
-# Editar data/clients_source.xlsx con los datos de cada cliente
-
-# 4. Ejecutar el pipeline completo
-cd src
-python orchestrator.py
-
-# O reanudar desde un stage concreto (p.ej., tras un fallo de la API meteorológica)
-python orchestrator.py --stage 3
-
-# Dry-run para validar el plan de ejecución sin ejecutar nada
-python orchestrator.py --dry-run
-```
+| Herramienta | Versión | Rol en el proyecto |
+|---|---|---|
+| **Python** | 3.11+ | Lenguaje del pipeline completo |
+| **pvlib** | 0.11 | Cálculo de posición solar, GHI, Erbs, POA, Faiman |
+| **pandas** | 2.x | Transformación, resampleo e imputación de datos |
+| **SQLAlchemy** | 2.x | ORM/core para escritura idempotente en SQLite |
+| **SQLite** | 3.x | Almacén analítico embebido (Bronze→Silver→Gold) |
+| **requests** | 2.x | Clientes HTTP para REE y OpenWeatherMap |
+| **python-dotenv** | 1.x | Gestión de secretos y configuración de entorno |
 
 ---
 
-## 📁 Estructura del Proyecto
+## 04 · Funcionalidades principales
+
+- ✅ **Arquitectura Medallion completa** — Bronze → Silver → Gold con trazabilidad de linaje en cada capa
+- ✅ **Idempotente por diseño** — reejecutar el pipeline no duplica registros (upsert con clave compuesta en Silver y Gold)
+- ✅ **Motor físico PV de alta fidelidad** — irradiancia Haurwitz + Kasten-Czeplak + descomposición Erbs + modelo Faiman para temperatura de célula
+- ✅ **Resiliencia ante fallos parciales** — REE sin publicar precios devuelve `PARTIAL SUCCESS`, no aborta el pipeline
+- ✅ **Multi-cliente escalable** — el pipeline itera sobre todos los clientes activos; añadir uno no requiere cambios de código
+- ✅ **Auditoría automática** — cada ejecución persiste estado, duración, filas procesadas y errores en `etl_metadata`
+- ✅ **Tarifas eléctricas españolas** — clasificación automática P1/P2/P3/P6 con festivos nacionales y franjas horarias oficiales
+
+---
+
+## 05 · Estructura del repositorio
 
 ```
-05.02_SunSaver_ETL/
-├── data/
-│   ├── clients_source.xlsx     # Configuración maestra de instalaciones
-│   └── sunsaver.db             # Base de datos SQLite (creada automáticamente)
-├── docs/                       # Diagramas de arquitectura y documentación de referencia
-├── logs/                       # Logs de ejecución del pipeline
+sunsaver/
 ├── src/
-│   ├── orchestrator.py         # Controlador del pipeline
-│   ├── db_manager.py           # Resolución de la ruta a la base de datos
-│   ├── pv_generation_engine.py # Modelos físicos (GHI, DNI, POA, Faiman)
-│   ├── extract_*.py            # Extractores capa Bronce
-│   ├── transform_*.py          # Transformadores capa Plata
-│   └── transform_gold_*.py     # Constructores capa Oro
-├── venv/
+│   ├── bronze_ingest_clients.py      # Extracción Excel → JSON Bronze (clientes)
+│   ├── bronze_ingest_prices_ree.py   # Extracción API REE → JSON Bronze (PVPC)
+│   ├── bronze_ingest_weather_owm.py  # Extracción OWM → JSON Bronze (meteorología)
+│   ├── silver_transform_clients.py   # Validación y carga Silver de clientes
+│   ├── silver_transform_prices.py    # Validación y carga Silver de precios
+│   ├── silver_transform_weather.py   # Validación, resampleo y carga Silver de clima
+│   ├── silver_calc_pv_generation.py  # Simulación física PV → clean_calculations
+│   ├── gold_dim_clients.py           # Dimensión cliente (flags has_solar, has_battery)
+│   ├── gold_dim_datetime.py          # Dimensión tiempo (calendario + tarifas P1–P6)
+│   ├── gold_dim_weather.py           # Dimensión condición meteorológica (tipo 2)
+│   ├── gold_fact_energy_forecast.py  # Fact table: generación · consumo · precio
+│   ├── engine_pv_physics.py          # Librería física PV reutilizable (pvlib)
+│   ├── config_paths.py               # Rutas absolutas resolubles con override .env
+│   ├── logger_config.py              # Logger centralizado con rotación diaria
+│   ├── audit_metadata.py             # Persistencia de métricas de ejecución
+│   └── pipeline_runner.py            # Orquestador CLI con --stage y --dry-run
+├── data/
+│   ├── bronze/                       # JSONs raw inmutables (chmod 444)
+│   ├── clients_source.xlsx           # Master de instalaciones (fuente de verdad)
+│   └── sunsaver.db                   # Base de datos SQLite (todas las capas)
+├── logs/                             # Logs diarios: sunsaver_YYYY-MM-DD.log
+├── .env.example                      # Plantilla de variables de entorno
 ├── requirements.txt
 └── README.md
 ```
 
 ---
 
-## 🔧 Variables de Entorno
+## 06 · Instalación y configuración
 
-| Variable | Obligatoria | Descripción |
-|----------|-------------|-------------|
-| `WEATHER_API_KEY` | ✅ Sí | Clave API de OpenWeatherMap (nivel gratuito suficiente) |
-| `DB_PATH` | ❌ Opcional | Sobrescribe la ruta por defecto de SQLite (`data/sunsaver.db`) |
+**Prerequisitos:** Python 3.11+, pip, acceso a las APIs de REE y OpenWeatherMap.
+
+```bash
+# 1. Clonar el repositorio
+git clone https://github.com/tu-usuario/sunsaver.git
+cd sunsaver
+
+# 2. Crear entorno virtual e instalar dependencias
+python -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+
+# 3. Configurar variables de entorno
+cp .env.example .env
+# Editar .env con las claves de API y rutas opcionales
+```
+
+Las variables de entorno necesarias están documentadas en `.env.example`. Las dos imprescindibles son `WEATHER_API_KEY` (OpenWeatherMap) y opcionalmente `DB_PATH` si se quiere un SQLite fuera del directorio por defecto.
 
 ---
 
-## 📈 Valor de Negocio
+## 07 · Uso rápido
 
-| Capacidad | Impacto |
-|-----------|---------|
-| Previsión hora a hora de generación + precio | Permite desplazamiento de cargas para ahorrar un 20–40% en coste de red eléctrica |
-| Arquitectura multi-cliente | Un solo pipeline sirve a N instalaciones industriales simultáneamente |
-| Etiquetado de periodos tarifarios españoles (P1–P6) | Integración directa con sistemas de facturación y gestión de demanda |
-| Capa Bronce con auditoría completa | Cumplimiento regulatorio y capacidad de replay histórico |
-| Modelo de generación basado en física (no en ML) | Fiable incluso para instalaciones nuevas sin datos históricos |
-| Patrón UPSERT idempotente | Seguro de re-ejecutar sin corrupción de datos |
+```bash
+# Pipeline completo (recomendado para producción)
+python src/pipeline_runner.py
+
+# Dry-run: ver el plan de ejecución sin tocar datos
+python src/pipeline_runner.py --dry-run
+
+# Reanudar desde un stage concreto (ej: recalcular desde PV en adelante)
+python src/pipeline_runner.py --stage 5
+```
+
+**Salida esperada (fragmento):**
+
+```
+2026-05-13 08:00:01 | INFO     | pipeline_runner               | ── STAGE 1 ────────────────────────────
+2026-05-13 08:00:02 | INFO     | pipeline_runner               |   ✔  extract_clients completado (1.2s) | Filas: 12
+2026-05-13 08:00:03 | INFO     | pipeline_runner               |   ✔  extract_energy_prices completado (0.8s) | Filas: 24
+...
+2026-05-13 08:01:47 | INFO     | pipeline_runner               | PIPELINE FINALIZADO en 106.43s
+2026-05-13 08:01:47 | INFO     | pipeline_runner               | Total Filas: 3.847  |  Steps OK: 11  |  Steps KO: 0
+```
 
 ---
 
+## 08 · Configuración avanzada
 
-> *Construido para responsables de energía industrial que están hartos de hojas de cálculo y listos para ingeniería de datos real.*
+| Parámetro | Defecto | Descripción |
+|---|---|---|
+| `--stage N` | `1` | Stage desde el que arrancar el pipeline (1–6) |
+| `--dry-run` | `false` | Muestra el plan sin ejecutar ninguna función |
+| `DB_PATH` | `data/sunsaver.db` | Ruta absoluta a la base de datos SQLite |
+| `BRONZE_PATH` | `data/bronze/` | Directorio de almacenamiento de archivos Bronze |
+| `WEATHER_API_KEY` | — | API key de OpenWeatherMap (obligatoria) |
+
+**Modos de ejecución:**
+
+- **Completo** — `pipeline_runner.py` sin argumentos. Reprocesa todo desde Stage 1.
+- **Incremental** — `--stage 5` o superior. Útil cuando solo cambian los datos de generación.
+- **Dry-run** — validación de configuración y dependencias sin efectos secundarios.
+
+Los manifests de Bronze (`_process_manifest_*.json`) actúan como cola de trabajo: las tareas con estado `pending` o `error` se reintentarán automáticamente en la siguiente ejecución.
+
+---
+
+## 09 · Testing y calidad de datos
+
+```bash
+# Ejecutar tests unitarios
+pytest tests/ -v --tb=short
+
+# Test standalone del motor físico PV (sin base de datos)
+python src/engine_pv_physics.py
+```
+
+Las validaciones de calidad están integradas en cada capa Silver:
+
+- **Tipos** — coerción con `pd.to_numeric` y `pd.to_datetime`; valores no parseables pasan a `NaN` antes de ser descartados o imputados.
+- **Rangos geográficos** — latitud `[-90, 90]`, longitud `[-180, 180]`; registros fuera de rango se eliminan.
+- **Reglas de negocio** — ángulo `[0°–90°]`, pérdidas `[0%–90%]`, eficiencia `[0–1]`; fuera de rango se imputan con valores de referencia de la industria.
+- **Precios** — outliers fuera de `[-100, 2 000] EUR/MWh` filtrados; huecos interpolados linealmente por tipo de precio.
+
+---
+
+## 10 · Observabilidad y errores
+
+Los logs se escriben simultáneamente en consola y en `logs/sunsaver_YYYY-MM-DD.log` con rotación diaria automática. El formato es `TIMESTAMP | LEVEL | MODULE | MESSAGE`, lo que facilita el filtrado con `grep` o cualquier agregador de logs.
+
+Ante un fallo en una tarea individual, el orquestador **no aborta**: marca la tarea como `error` en el manifest y continúa. Si un stage completo falla (todos los pasos del stage devuelven `False`), el pipeline se detiene con `FAILED AT STAGE N`. En cualquier caso, la ejecución se registra en `etl_metadata` con estado `PARTIAL SUCCESS` o `FAILED`, duración y resumen del error.
+
+Los archivos Bronze (chmod 444) son **inmutables** una vez escritos: garantía de que el dato raw original nunca se modifica, solo se vuelve a procesar desde Silver hacia arriba.
+
+---
+
+## 11 · Decisiones de diseño
+
+**Arquitectura Medallion sobre un data warehouse convencional** — La separación Bronze/Silver/Gold permite reejecutar cualquier transformación sin perder el dato original. Con un DWH clásico habríamos necesitado tablas de staging adicionales y lógica de rollback.
+
+**SQLite sobre PostgreSQL para la capa analítica** — El volumen actual (decenas de clientes, horizonte de 5 días) no justifica la complejidad operacional de un servidor. SQLite permite entregar el proyecto completo como un único fichero portable; la migración a PostgreSQL es trivial porque SQLAlchemy abstrae el dialecto.
+
+**Motor físico propio (pvlib) sobre APIs de terceros de predicción solar** — El cálculo determinista garantiza reproducibilidad completa: dado el mismo input meteorológico, el output es idéntico. Una API externa añadiría latencia, coste y una caja negra en el modelo.
+
+**Manifests JSON como cola de trabajo en Bronze** — Evita una dependencia de infraestructura (Redis, Celery, Airflow) manteniendo la capacidad de reintentar tareas fallidas individualmente. La solución es suficientemente robusta para el volumen actual y trivial de entender.
+
+**Roadmap:**
+- Scheduler con APScheduler o cron para ejecución autónoma diaria
+- Exportación de resultados a Parquet para integración con herramientas BI (Power BI, Metabase)
+- Soporte multi-zona horaria para instalaciones fuera de España peninsular
+- Contenerización con Docker para despliegue reproducible
+
+---
+
+## 12 · Licencia
+
+MIT License · © 2026 SunSaver Project

@@ -1,7 +1,7 @@
 # ☀️ SunSaver ETL · Plataforma de Inteligencia Energética Industrial
 ## 06 Especificación de Integraciones API
 > **Clasificación:** INTERNA &nbsp;|&nbsp; **Estado:** ACTIVO — Entorno DEV &nbsp;|&nbsp; **Pipeline:** `SunSaver_ETL`  
-> **Audiencia:** Ingenieros de Backend, Data Engineers, DevOps &nbsp;|&nbsp; **Última actualización:** 2026-05-10
+> **Audiencia:** Ingenieros de Backend, Data Engineers, DevOps &nbsp;|&nbsp; **Última actualización:** 2026-05-12
 
 ---
 

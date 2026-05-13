@@ -2,7 +2,7 @@
 ## 07 Operations Runbook
 
 > **Clasificación:** INTERNA &nbsp;|&nbsp; **Estado:** ACTIVO — Entorno DEV &nbsp;|&nbsp; **Pipeline:** `SunSaver_ETL`  
-> **Audiencia:** Ingenieros de guardia, DevOps, SRE &nbsp;|&nbsp; **Última actualización:** 2026-05-10
+> **Audiencia:** Ingenieros de guardia, DevOps, SRE &nbsp;|&nbsp; **Última actualización:** 2026-05-12
 
 ---
 

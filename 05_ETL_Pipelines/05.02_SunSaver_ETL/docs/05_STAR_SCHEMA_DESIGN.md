@@ -2,7 +2,7 @@
 ## 05 Diseño del Star Schema (Gold Layer)
 
 > **Clasificación:** INTERNA &nbsp;|&nbsp; **Estado:** ACTIVO — Entorno DEV &nbsp;|&nbsp; **Capa:** Gold  
-> **Audiencia principal:** Analistas de datos, Científicos de datos, Ingenieros BI &nbsp;|&nbsp; **Última actualización:** 2026-05-10
+> **Audiencia principal:** Analistas de datos, Científicos de datos, Ingenieros BI &nbsp;|&nbsp; **Última actualización:** 2026-05-12
 
 ---
 
