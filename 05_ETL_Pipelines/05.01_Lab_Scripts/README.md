@@ -1,4 +1,4 @@
-# 🚀 05.01 Extractors: Ingesta de Datos Multifuente
+# 🚀 05.01_Lab_Scripts
 
 ## 📂 Descripción del Proyecto
 
