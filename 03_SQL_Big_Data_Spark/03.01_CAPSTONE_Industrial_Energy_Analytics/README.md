@@ -45,8 +45,9 @@ Las herramientas convencionales (Excel, bases de datos relacionales) colapsan an
 
 <br>
 
-> **Cómo leer el gráfico:** Cada punto rojo es un evento crítico por encima de 6,9 kW, etiquetado con su frecuencia de ocurrencia. El área azul es la demanda media (muy por debajo del umbral). Desplazar el uso de lavandería fuera de la franja 18:00–22:00 elimina el 100% de los eventos críticos detectados.
+> **Cómo leer el gráfico:** El subplot superior muestra cuántas veces en 4 años de datos (2.075.259 registros) se superó el límite de 6,9 kW en cada franja horaria — la hora más crítica son las 20:00 con 413 eventos acumulados. El subplot inferior muestra la demanda media real: la instalación opera habitualmente por debajo de 2 kW, muy lejos del límite. Desplazar el uso de lavandería fuera de la franja 18:00–22:00 elimina el 100% de los eventos críticos detectados sin reducir el confort.
 </details>
+
 ---
  
 ### H2 · Detección de Anomalías Estadísticas (3σ) ✅ VALIDADA
@@ -61,8 +62,12 @@ Las herramientas convencionales (Excel, bases de datos relacionales) colapsan an
 <summary><b>📈 Ver evidencia: Seguimiento Forense de Carga del Horno</b></summary>
 <br>
 <img src="./docs/H2_Oven_Incident_Power_Analysis.png" alt="H2 Oven Incident Analysis" width="800">
+
+<br>
+
 > **Cómo leer el gráfico:** La línea roja (potencia cocina) muestra un patrón de ciclado perfecto de termostato desde las 22:30 hasta las 01:27 — firma característica de un elemento resistivo manteniendo temperatura. La desconexión manual a las 01:27 descarta cualquier avería mecánica.
 </details>
+
 ---
  
 ### H3 · Consumo Residual y Eficiencia Pasiva ✅ VALIDADA — CRÍTICA
@@ -78,8 +83,11 @@ Las herramientas convencionales (Excel, bases de datos relacionales) colapsan an
 <br>
 <img src="./docs/H3_NILM_Fridge_Signature.png" alt="H3 NILM Fridge Signature" width="800">
 
+<br>
+
 > **Cómo leer el gráfico:** La línea azul muestra el consumo real entre la 01:00 y las 05:30 (sin ocupantes activos). La oscilación regular (subida → bajada → subida) es la firma de ciclado del compresor. El delta entre picos y valles (~0,24 kW) es consistente con una unidad de refrigeración pre-Inverter.
 </details>
+
 ---
  
 ### H4 · Calidad de Suministro y Estabilidad de Tensión ⚠️ PARCIALMENTE VALIDADA
@@ -94,13 +102,19 @@ Las herramientas convencionales (Excel, bases de datos relacionales) colapsan an
 <summary><b>📈 Ver evidencia: Distribución del Estrés de Red vs. Curva de Carga Propia</b></summary>
 <br>
 <img src="./docs/H4_correlation_stress.png" alt="H4 Correlation Stress" width="800">
+
+<br>
+
 > **Cómo leer el gráfico:** Los eventos de estrés (barras rosas) se concentran a las 10:00, cuando el consumo propio de la vivienda (línea azul) ya está bajando. Esto es lo contrario de lo que produciría una impedancia interna elevada — evidencia clave del origen externo.
 </details>
 <details>
 <summary><b>📈 Ver evidencia: Análisis de Causa Raíz — Eventos en Zona de Estrés</b></summary>
 <br>
 <img src="./docs/H4_root_cause_analysis.png" alt="H4 Root Cause Analysis" width="800">
-> **Cómo leer el gráfico:** El 72,5% de los minutos de estrés se clasifican como "External/Grid Weakness". Solo el 2,2% corresponde a estrés por picos críticos internos. La red interna no es el problema.
+
+<br>
+
+> **Cómo leer el gráfico:** El 72,5% de los minutos de estrés se clasifican como "debilidad de la red externa". Solo el 2,2% corresponde a estrés por picos críticos internos. La red interna no es el problema.
 </details>
 
 ---
