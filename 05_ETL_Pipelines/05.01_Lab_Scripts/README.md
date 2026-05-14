@@ -1,6 +1,6 @@
 # 🚀 05.01_Lab_Scripts
 
-## 📂 Descripción del Proyecto
+## 📂 Descripción del Directorio
 
 Este directorio constituye el núcleo práctico del **Modulo 5**, cubriendo el ciclo de vida completo de un Pipeline ETL (Extract, Transform, Load). El enfoque en este bloque ha evolucionado desde la recuperación técnica de activos digitales mediante protocolos de red hasta la construcción de sistemas robustos que orquestan el flujo de datos desde APIs externas hacia almacenes de datos relacionales (SQLite/SQL).
 
