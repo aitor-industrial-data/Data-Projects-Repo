@@ -42,6 +42,9 @@ Las herramientas convencionales (Excel, bases de datos relacionales) colapsan an
 <summary><b>📈 Ver evidencia: Frecuencia de Picos Críticos vs. Umbral 6,9 kW</b></summary>
 <br>
 <img src="./docs/H1_Frequency_LoadShift_Plot.png" alt="H1 Load Shift Plot" width="800">
+
+<br>
+
 > **Cómo leer el gráfico:** Cada punto rojo es un evento crítico por encima de 6,9 kW, etiquetado con su frecuencia de ocurrencia. El área azul es la demanda media (muy por debajo del umbral). Desplazar el uso de lavandería fuera de la franja 18:00–22:00 elimina el 100% de los eventos críticos detectados.
 </details>
 ---
@@ -74,6 +77,7 @@ Las herramientas convencionales (Excel, bases de datos relacionales) colapsan an
 <summary><b>📈 Ver evidencia: Firma NILM — Circuito "Otros" vs. Perfil Histórico</b></summary>
 <br>
 <img src="./docs/H3_NILM_Fridge_Signature.png" alt="H3 NILM Fridge Signature" width="800">
+
 > **Cómo leer el gráfico:** La línea azul muestra el consumo real entre la 01:00 y las 05:30 (sin ocupantes activos). La oscilación regular (subida → bajada → subida) es la firma de ciclado del compresor. El delta entre picos y valles (~0,24 kW) es consistente con una unidad de refrigeración pre-Inverter.
 </details>
 ---
