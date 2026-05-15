@@ -43,7 +43,7 @@ La arquitectura del sistema ha sido diseñada para maximizar el rendimiento del 
 
 ### 2.1. Ecosistema de Ejecución (Environment)
 El pipeline opera en un entorno de desarrollo de alto nivel que asegura la paridad con sistemas de producción:
-* **Infraestructura:** Uso de VS Code Remote conectado a una instancia nativa de Ubuntu sobre WSL2. Esta configuración permite ejecutar Apache Spark v4.1.1 con rendimiento de kernel Linux.
+* **Infraestructura:** Entorno de desarrollo nativo sobre Ubuntu 24.04 LTS, eliminando capas de virtualización para obtener el máximo rendimiento del kernel Linux. Ejecución de Apache Spark v4.1.1 optimizada para hardware local, aprovechando los 32 GB de RAM y la arquitectura multihilo del procesador Intel de 13ª Gen.
 * **Gestión Crítica de Memoria:** A diferencia de configuraciones estándar, se ha optimizado la sesión de Spark para aprovechar los 32 GB de RAM del sistema Medion, asignando 16 GB al Driver y 8 GB al Executor. Esta asignación es clave para procesar los 2.07 millones de registros íntegramente en memoria sin recurrir a intercambio en disco (spilling).
 
 ### 2.2. Capas del Pipeline de Datos

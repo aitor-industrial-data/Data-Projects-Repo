@@ -23,7 +23,7 @@ Las herramientas convencionales (Excel, bases de datos relacionales) colapsan an
 | ⚙️ Motor de procesamiento | Apache Spark v4.1.1 (PySpark) |
 | ⏱️ Tiempo de ejecución (ETL completo) | 17,3 segundos |
 | 💾 Optimización de almacenamiento | CSV → Parquet (compresión Snappy) |
-| 🖥️ Entorno | Ubuntu WSL2 · VS Code Remote · 32 GB RAM |
+| 🖥️ Entorno | Ubuntu 24.04 LTS (Native) · VS Code · 32 GB RAM |
 | 💡 Hipótesis validadas | 4 de 4 (3 confirmadas ✅ · 1 parcial ⚠️) |
  
 ---
@@ -126,7 +126,7 @@ Las herramientas convencionales (Excel, bases de datos relacionales) colapsan an
 | # | Acción | Inversión estimada | Ahorro energético | Ahorro en € / año | ROI |
 |---|---|---|---|---|---|
 | H1 | ↓ Potencia contratada: 10 kW → 6,9 kW | **€0** *(gestión tarifaria)* | — | **~186 €** *(3,1 kW × 60 €/kW)* | **Inmediato** |
-| H3a | Sustituir arcón/vinoteca por tecnología Inverter | **~300 €** *(gama media, MediaMarkt/El Corte Inglés)* | 1.068 kWh/año | **~146 €** *(× 0,137 €/kWh)* | **~2 años** |
+| H3a | Sustituir arcón/vinoteca por tecnología Inverter | **~300 €** *(gama media)* | 1.068 kWh/año | **~146 €** *(× 0,137 €/kWh)* | **~2 años** |
 | H3b | Instalar Smart Kill-Switches (4× Tapo P110, ~15 €/ud) | **~60 €** *(enchufes inteligentes con monitoreo)* | ~700 kWh/año | **~96 €** | **< 1 año** |
 | | | | | | |
 | | **TOTAL** | **~360 €** | **~1.768 kWh/año** | **🟢 ~428 €/año** | **< 1 año** *(global)* |
@@ -141,7 +141,7 @@ Las herramientas convencionales (Excel, bases de datos relacionales) colapsan an
 Apache Spark v4.1.1 (PySpark)    — Motor de computación distribuida
 Spark SQL + Window Functions      — Análisis estadístico y validación de hipótesis
 Apache Parquet + Snappy           — Almacenamiento columnar y compresión
-Ubuntu WSL2 + VS Code Remote      — Ejecución nativa en Linux
+Ubuntu 24.04 LTS (Native)         — Entorno de ejecución Linux nativo
 Python                            — Lógica ETL e ingeniería de características
 ```
  
