@@ -1,4 +1,4 @@
-# 04.04 Data Processing Scripts
+# 03.04 Data Processing Scripts
 
 ## 📂 Descripción del Proyecto
 Este directorio representa la culminación del bloque **Python Core**, donde la lógica de programación se aplica directamente a la resolución de problemas reales de ingeniería y gestión de datos. El enfoque aquí es la **robustez y la integración**: crear scripts que no solo procesen información, sino que lo hagan de forma segura, optimizada y conectada a bases de datos relacionales.

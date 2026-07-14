@@ -1,4 +1,4 @@
-# 🚀 05.01_Lab_Scripts
+# 🚀 04.01_Lab_Scripts
 
 ## 📂 Descripción del Directorio
 

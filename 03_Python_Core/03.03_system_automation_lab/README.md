@@ -1,4 +1,4 @@
-# 04.03 System Automation & Lab
+# 03.03 System Automation & Lab
 
 ## 📂 Descripción del Proyecto
 Este directorio marca el inicio de la **automatización operativa** dentro del sistema. Como ingeniero, el enfoque en este bloque se desplaza desde la lógica pura en memoria hacia la interacción con el sistema de archivos del sistema operativo. Se busca construir herramientas que gestionen la persistencia de datos y la organización de activos digitales de forma autónoma.

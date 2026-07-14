@@ -1,4 +1,4 @@
-# 05_ETL_PIPELINES
+# 04_ETL_PIPELINES
 
 > **Módulo 5 · Data Engineering** — Ciclo de vida completo de un pipeline ETL: extracción masiva desde múltiples fuentes, transformación y normalización de datos, y persistencia en bases de datos relacionales.
 
@@ -7,16 +7,16 @@
 ## 📁 Estructura del módulo
 
 ```
-05_ETL_Pipelines/
-├── 05.01_Lab_Scripts/          # Laboratorio base: 14 scripts progresivos
+04_ETL_Pipelines/
+├── 04.01_Lab_Scripts/          # Laboratorio base: 14 scripts progresivos
 │   └── scripts/
-└── 05.02_SunSaver_ETL/         # Proyecto final: pipeline ETL de producción
+└── 04.02_SunSaver_ETL/         # Proyecto final: pipeline ETL de producción
     └── scripts/
 ```
 
 ---
 
-## 🧪 [05.01 · Lab Scripts](./05.01_Lab_Scripts/)
+## 🧪 [04.01 · Lab Scripts](./04.01_Lab_Scripts/)
 
 Batería de **14 scripts progresivos** que cubren desde la conexión a nivel de socket hasta la carga masiva en SQL. Cada script aísla y domina una competencia técnica concreta.
 
@@ -39,7 +39,7 @@ Batería de **14 scripts progresivos** que cubren desde la conexión a nivel de 
 
 ---
 
-## 🏗️ [05.02 · SunSaver ETL](./05.02_SunSaver_ETL/)
+## 🏗️ [05.02 · SunSaver ETL](./04.02_SunSaver_ETL/)
 
 Proyecto de ingeniería de datos de **nivel producción**. Implementa un pipeline ETL robusto e idempotente sobre datos del mercado de criptomonedas, integrando las competencias adquiridas en el laboratorio anterior.
 
